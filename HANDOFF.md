@@ -1,6 +1,8 @@
 # Handoff: lobbylink_perfv3
 
-Corte: 2026-11-05. Para el agente que siga. Léelo en este orden: este archivo → `docs/PLAN.md` (método y por qué de cada valor) → `README.md` (comandos) → `setup/EC2.md` (AWS). Contexto del curso y reglas generales: `../CLAUDE.md`. Enunciado: <https://sitio-production-fdff.up.railway.app/computacional/proyecto.html>.
+**Estado vigente: sección 11 (2026-11-09).** Lo anterior es historia y contexto.
+
+Corte original: 2026-11-05. Para el agente que siga. Léelo en este orden: este archivo → `docs/PLAN.md` (método y por qué de cada valor) → `README.md` (comandos) → `setup/EC2.md` (AWS). Contexto del curso y reglas generales: `../CLAUDE.md`. Enunciado: <https://sitio-production-fdff.up.railway.app/computacional/proyecto.html>.
 
 ## 1. Qué es y por qué existe
 
@@ -140,3 +142,33 @@ Cierran limitaciones de la sección 6 del informe. Nada sobrescribe corridas ant
 - En el PC, cuando esté libre: `campanas/pendientes_local.sh` (unas 11 h 20 en total, partible con `SOLO`). Agrega el contador de frecuencia por hilo (`win-sampler.ps1`, `telemetry/frecuencia.mjs`), F1 de 360 s, F7 del contenedor con `-Xmx700m`, f7d, f9 en Docker, F6 de login y de `mezcla-postman`, y la tercera repetición de F6 con el jar corregido.
 - Contadores de hardware: `setup/UPROF.md`.
 - Cambios en las herramientas: `campana.sh` acepta `JAR`, `JAVA_OPTS`, `F1_OPS`, `F1_SEG`, `REP_FROM`, `NO_PROPIO` y las fases `f7d` y `f9`; `run.mjs` pasa `--java-opts` también en Docker y acepta `--bulk`; `lib/bulk.mjs` inserta lobbies directo en mongod.
+
+## 11. Estado al 2026-11-09, noche (para retomar)
+
+**AWS: hecho y apagado.** Las instancias i-0077b0b26e1e0cff0 (t3.small Unlimited) e i-0c0cdd0fa3355982e (c7i-flex.large) están `terminated` (comprobado con `aws ec2 describe-instances`). No queda nada encendido en AWS.
+
+Datos traídos:
+- `resultados/ec2_t3small-pend/`: `f9-caliente`, `f9-frio`, `f7d-datos-2000`, `f7d-datos-20000`, y en `_logs/` la predicción escrita antes (`prediccion_datos_ec2_20261109_170101.md`) y el estado de la campaña.
+- `resultados/ec2_t3small-xmx/f7d-datos-20000/`: la repetición de 20.000 lobbies con `-Xmx1g`.
+
+Resultados, ya escritos en `informe/informe.md` (sección 3 de la t3.small, respuestas de la sección 4 y limitaciones de la sección 6; commit `d44583f`, **sin push**):
+- **F9, datos que no caben en memoria** (1.000.000 de lobbies, 3.117 MB contra 1,9 GiB): todos los niveles pasan hasta 400 req/s. A 400 req/s los fallos de caché suben de 0 % a 12-14 %, el disco llega a 365 IOPS (12 % de su capacidad) con `wa` 3,4 %, y el p95 sube de 28 a 121 ms. La CPU se llena antes que el disco.
+- **F7d, 2.000 lobbies:** pasa. Predicción 9 % de CPU, medido 14 %.
+- **F7d, 20.000 lobbies:** 100 % de errores aunque la predicción daba 37 % de CPU. Falla la memoria: heap por defecto de 478 MB, 95 pausas Full GC y `OutOfMemoryError` que mata el hilo `http-nio-8080-Poller` de Tomcat. Con `-Xmx1g` el kernel mata a Java a los 30 s (949 MB de Java más ~580 MB de `mongod` en 1,9 GiB). Conclusión del informe: la t3.small vale hasta pocos miles de lobbies; antes de 20.000 hay que paginar `GET /api/lobbies` (no medido).
+- `campanas/campana.sh` ahora pasa `JAVA_OPTS` a la app del servidor EC2.
+
+**Disco del PC.** Hoy C: llegó a 5 MB libres, sin causa encontrada (no fueron las corridas: lo bajado de AWS pesa 5,4 MB; el archivo de paginación tiene 20 GB asignados). Al cerrar la sesión había 11 GB libres. **Antes de lanzar pruebas en el PC, comprueba con `df -h /c` que haya al menos 5 GB** (p9 pide unos 2 GB). No se borró nada.
+
+**Siguiente paso: pruebas del PC.** Desde Git Bash como administrador, con el PC sin otros programas:
+
+```bash
+cd lobbylink_perfv3 && SOLO="p3 p2 p4 p8" nohup ./campanas/pendientes_local.sh > resultados/_logs/_pendientes.txt 2>&1 &
+```
+
+Unas 2 h 10. Estado en `resultados/_logs/_pendientes_estado.txt`. Lo opcional (`SOLO="p9 p7 p5 p6"`, ~9 h 20) solo si sobra tiempo. Nota: p3 (equivalencia) ya está hecha en la t3.small; en el PC es una confirmación de 5 min.
+
+**Después de las pruebas del PC:**
+1. Leer cada corrida nueva y agregar sus números al informe: frecuencia por hilo (p2) en la explicación de BCrypt en Windows; F7 del contenedor con `-Xmx700m` (p4) donde el informe dice que el heap de 256 MB es un riesgo; f7d en PC y Docker (p8) junto a la de la t3.small, y quitar de la sección 6 la cautela de que F7d "por ahora solo en la t3.small".
+2. Regenerar el dashboard: `node dashboard/build.mjs`.
+3. Revisar el largo del informe (6-10 páginas) y preparar la sustentación de 7 min.
+4. `git push` cuando el usuario lo pida.
