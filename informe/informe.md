@@ -34,16 +34,57 @@ Cada corrida crea una base nueva con 1 videojuego, 20 usuarios y 200 lobbies de 
 - `mezcla-lectura` manda 50 % de listados con `GET /api/lobbies` y 50 % de consultas de un lobby con `GET /api/lobbies/{id}`. No crea datos, así que la carga es la misma del primer al último segundo. Es la mezcla con la que comparamos las máquinas.
 - `mezcla-postman` manda los seis endpoints de la colección en partes iguales, un sexto de registro, login, crear lobby, listar, ver y unirse. Crea un lobby cada seis peticiones, así que el listado se encarece durante la corrida. La usamos solo para validar el modelo en la rampa.
 
-**Cuánto y cuánto tiempo.** Las tasas no son supuestas. Salen de una cadena de fases en la que cada una usa lo que midió la anterior.
+**Cuánto y cuánto tiempo.** Las tasas no son supuestas. Salen de una cadena de fases en la que cada una usa lo que midió la anterior. F1 mide cuánto cuesta cada petición, el modelo convierte ese costo en un techo predicho, F5 comprueba el techo con una rampa y F6 compara las máquinas con una escala común. `campanas/campana.sh` corre las fases en ese orden y con los mismos parámetros en las tres opciones.
 
-- **F0, techo del hardware.** Sin la app, `fio` mide el disco durante 60 s por prueba con lectura aleatoria de 4 KiB, escritura con `fsync` y lectura secuencial de 1 MiB. `iperf3` mide la red durante 30 s.
-- **F1, costo por petición.** Un solo cliente manda peticiones a cada uno de los seis endpoints por separado, durante 120 s y con 20 s de calentamiento. Da D, los milisegundos de CPU que cuesta una petición, separados entre la app y `mongod`.
-- **F2, crecimiento con los datos.** Un cliente que solo lista corre 90 s por tamaño, con 100, 200, 400, 800 y 1.600 lobbies.
-- **F3 y F4, paralelismo y cuotas.** Son corridas en bucle cerrado de 60 s por nivel. F3 sube de 1 cliente hasta el doble de los hilos. F4 prueba en el contenedor seis combinaciones de cuota, de 0,5 a 4 CPU, con 1, 4 y 16 clientes.
-- **F5, rampa.** La tasa sube del 10 % al 150 % del techo que predice el modelo, en pasos de 10 % y con 90 s por nivel.
-- **F6, carga sostenida y comparación.** Las tres opciones reciben la misma escala de 5, 10, 20, 40 y 80 req/s. Cada nivel dura 600 s, con 30 s de calentamiento y 60 s de pausa, y cada opción corre tres repeticiones con las semillas 1, 2 y 3. Una repetición completa dura unos 58 minutos. Con el código corregido, el PC siguió con 160 y 320 req/s.
-- **F7, carga multiplicada por diez.** Un escenario manda 100 req/s con 200 lobbies, diez veces el tráfico. El otro manda 10 req/s con 2.000 lobbies, diez veces los datos. Cada uno dura 600 s. `campana.sh` escribió la predicción del tráfico por diez en un archivo antes de cada corrida.
-- **F8, larga duración.** La t3.small Unlimited recibe 10 req/s durante 40 minutos y la Standard 23 req/s durante 90 minutos, para ver los créditos de CPU y el crecimiento de la memoria.
+**F0, techo del hardware.** Antes de cargar la app medimos cuánto puede dar el hardware, para comparar después el uso de LobbyLink con un máximo medido y no con la ficha técnica. `fio` corre tres pruebas de 60 s sobre un archivo de 1 GiB y evita la caché del sistema operativo, así que mide el disco y no la RAM.
+
+- La primera lee bloques de 4 KiB al azar con 32 peticiones en vuelo y da las IOPS máximas.
+- La segunda escribe bloques de 4 KiB de uno en uno y hace `fsync` después de cada uno, que es lo que hace una base de datos al confirmar una escritura.
+- La tercera lee en secuencia bloques de 1 MiB con 8 en vuelo y da los MB/s.
+
+En el contenedor, `fio` corre dentro de un contenedor con la misma cuota de CPU que `mongod`. En la nube corre en la t3.small sobre el volumen EBS. `iperf3` mide la red entre el generador y el servidor durante 30 s con 4 conexiones en paralelo. Esa medición solo existe en AWS, porque en el PC y en el contenedor el generador y el servidor están en la misma máquina.
+
+**F1, costo por petición.** Responde cuánto cuesta cada endpoint por sí solo. Un único cliente en bucle cerrado manda una petición, espera la respuesta y manda la siguiente, así que nunca hay cola. Lo repetimos para los seis endpoints de la colección Postman: listar, ver un lobby, login, registro, crear lobby y unirse. Cada corrida dura 120 s después de 20 s de calentamiento, que le dan tiempo a la JVM de compilar el código más usado.
+
+- **Siembra.** Se siembran 20 usuarios para todos los endpoints. Para unirse se siembran 100, porque 100 usuarios por 200 lobbies dan 20.000 pares distintos y ninguna petición repite un par que ya se unió.
+- **Qué da.** De cada corrida sale D, los milisegundos de CPU por petición, separados entre la app y `mongod`. Es la CPU media del proceso menos la que usaba en reposo, dividida entre las peticiones por segundo. También salen las lecturas de disco y los bytes de red por petición.
+- **El modelo.** Con D, `model.mjs` aplica la ley de utilización, U = λ·D. El recurso con mayor D llega primero al 100 %, y la tasa a la que llega es el techo predicho, X_max.
+
+**F2, crecimiento con los datos.** Responde cómo sube el costo del listado cuando hay más lobbies. Es la corrida de F1 para el listado, repetida con bases de 100, 200, 400, 800 y 1.600 lobbies y 90 s por tamaño. Ajustamos el costo como una potencia del número de lobbies. Un exponente de 1 significa que el costo crece en la misma proporción que los datos, y uno mayor que crece más rápido. Con ese ajuste se predice qué pasa con diez veces más datos.
+
+**F3, paralelismo.** Responde cuánto gana la app con más núcleos. Corre en bucle cerrado con cada vez más clientes, desde 1 hasta el doble de los hilos de la máquina, pasando por el número de núcleos físicos y el de hilos. Cada nivel dura 60 s. Usamos dos cargas que ocupan partes distintas del sistema. El listado reparte el trabajo entre la app y `mongod`, y el login es BCrypt dentro de la JVM.
+
+- `amdahl.mjs` ajusta la ley de Amdahl a la curva de rendimiento y da la fracción paralela p.
+- Compara el rendimiento con tantos clientes como núcleos y con tantos como hilos. La diferencia es la ganancia de SMT, el segundo hilo de cada núcleo.
+- No corre en el contenedor, porque con 1 CPU no hay núcleos que sumar.
+
+**F4, cuotas del contenedor.** Responde cuál de los dos contenedores limita. Solo corre en Docker. Probamos seis repartos de CPU entre la app y `mongod`. En cuatro la app tiene 1 CPU y `mongod` recibe 0,5, 1, 2 o 4. En los otros dos `mongod` tiene 1 y la app recibe 2 o 4. Cada reparto corre con `mezcla-lectura` y con 1, 4 y 16 clientes en bucle cerrado, durante 60 s por nivel. Si darle más CPU a un contenedor no sube el rendimiento, ese contenedor no era el cuello de botella. El agente también cuenta cuántas veces el kernel frenó cada contenedor por agotar su cuota.
+
+**F5, rampa.** Responde si el modelo de F1 acierta. Parte del X_max predicho y sube la tasa del 10 % al 150 % de ese valor en pasos de 10 %. Cada nivel dura 90 s, con 20 s de calentamiento y 20 s de pausa. La rampa se corta después de dos niveles seguidos que no pasan, y corre una vez con cada mezcla. Comparamos el codo medido, que es la tasa en la que el p95 empieza a subir, con el predicho. Si coinciden, el modelo explica la máquina. Si no, hay un recurso que el modelo no está viendo.
+
+**F6, carga sostenida y comparación.** Responde la pregunta central: con el mismo tráfico, cómo le va a cada máquina. Las tres opciones reciben la misma escala absoluta de 5, 10, 20, 40 y 80 req/s con `mezcla-lectura`, para que una tasa dada signifique lo mismo en las tres.
+
+- **Duración.** Cada nivel dura 600 s, con 30 s de calentamiento y 60 s de pausa para que se vacíe la cola del nivel anterior. La corrida termina en el primer nivel que falla, porque los siguientes también fallarían.
+- **Repeticiones.** Cada opción corre tres repeticiones con las semillas 1, 2 y 3, que dan la variación entre corridas. Una repetición completa dura unos 58 minutos. Con el código corregido, el PC siguió con 160 y 320 req/s, porque a 80 todavía le sobraba casi toda la CPU.
+- **Nivel propio.** En el PC y en el contenedor hay una corrida más al 50 % y al 80 % del codo que midió F5 en esa misma máquina. Muestra qué le sobra a cada una cuando está holgada y cuando está casi llena.
+
+De F6 salen todas las métricas de la tabla de resultados.
+
+**F7, carga multiplicada por diez.** Responde qué pasaría si la carga se multiplicara por diez, como pide el enunciado. Toma como base 10 req/s, que las tres opciones pasan con el código original.
+
+- **Tráfico por diez.** En una misma corrida, la tasa pasa de 10 a 100 req/s con 200 lobbies, 600 s en cada nivel.
+- **Datos por diez.** La tasa se queda en 10 req/s, pero con 2.000 lobbies, durante 600 s.
+- **Predicción.** Antes de cada corrida, `campana.sh` escribió la predicción de `model.mjs` para el tráfico por diez en `resultados/_logs/`. La hora del archivo muestra que se escribió antes de medir.
+
+**F8, larga duración.** Responde qué cambia con el tiempo. Una t3 acumula créditos de CPU mientras trabaja por debajo de su línea base y los gasta cuando la supera. En modo Unlimited, AWS cobra el exceso cuando se acaban los créditos. En modo Standard, frena la instancia a la línea base. La Unlimited recibió 10 req/s durante 40 minutos y la Standard 23 req/s durante 90 minutos. Las dos corridas también muestran si la memoria de la app crece sin parar durante una corrida larga, que sería señal de una fuga.
+
+**F7d, datos por diez y por cien con la predicción escrita antes.** Responde lo mismo que la parte de datos de F7, pero corrige un defecto. En F7 la predicción de datos por diez se hizo después de medir. F7d la escribe antes. `prediccion_datos.mjs` toma el ajuste de F2 para la app y para `mongod` por separado, le suma el costo de ver un lobby que midió F1 y predice la utilización a 10 req/s con 2.000 y con 20.000 lobbies. Después corre 600 s con cada tamaño y el código corregido.
+
+**F9, datos que no caben en la caché.** Responde cuándo empieza a importar el disco. En todas las fases anteriores la base cabe en la caché de WiredTiger, el motor de almacenamiento de MongoDB, así que el disco no trabaja.
+
+- **Siembra.** F9 inserta los lobbies directamente en `mongod`, porque crearlos por la API tomaría horas. Cada uno lleva unos 3 KB de texto aleatorio que la compresión casi no reduce. Están cancelados para que el listado no los devuelva.
+- **Bases comparadas.** Una base de 20.000 lobbies, unos 60 MB, cabe en la caché. La otra no cabe. En el contenedor tiene 400.000 lobbies, unos 1,2 GB, con `mongod` limitado a 512 MB, de los que WiredTiger toma 256 MB. En la t3.small tiene 1.000.000 de lobbies, unos 3 GB, frente a 1,9 GiB de RAM.
+- **Carga.** Solo pide lobbies al azar por su id, de 25 a 400 req/s, con 300 s por nivel, y se detiene en el primer nivel que falla. Cuando los datos no caben, muchas peticiones tienen que leer del disco, y deberían aparecer IOPS y `wa` distintos de cero.
 
 **Cuándo pasa un nivel.** Un nivel pasa si el p95 es de 1.000 ms o menos y los errores no superan el 1 %. Los dos valores están en `telemetry/profiles/umbrales.json`. El límite de 1.000 ms lo declaramos nosotros. Con el código corregido ningún nivel cambia de resultado si el límite es 300 o 500 ms. Para recomendar una opción a una tasa pedimos además que su recurso más ocupado quede en promedio al 60 % de su capacidad o menos, y dejamos el resto como margen.
 
