@@ -59,7 +59,7 @@ if [ "$MODO" = ec2 ]; then
   HW=$(S 'echo $(lscpu -p=CORE | grep -v "#" | sort -u | wc -l) $(nproc)')   # núcleos físicos e hilos del servidor
   corre() { local lab=$2; shift 2; local d=$RES/$lab; mkdir -p "$d"
     estado "INICIO ec2 $lab"
-    S ". ~/.nvm/nvm.sh; tmux kill-session -t srv 2>/dev/null; cd ~/lobbylink_perfv3 && tmux new -d -s srv 'node telemetry/run.mjs --env linux --server-only --jar ~/app.jar --label $TAG-$lab > ~/srv_$TAG-$lab.log 2>&1'"
+    S ". ~/.nvm/nvm.sh; tmux kill-session -t srv 2>/dev/null; cd ~/lobbylink_perfv3 && tmux new -d -s srv 'node telemetry/run.mjs --env linux --server-only --jar ~/app.jar ${JAVA_OPTS:+--java-opts=$JAVA_OPTS} --label $TAG-$lab > ~/srv_$TAG-$lab.log 2>&1'"
     for k in $(seq 1 90); do curl -s -o /dev/null --max-time 2 "http://$SRV:8080/api/videojuegos" && break; sleep 2; done
     sleep 25   # el agente toma muestras en reposo (model.mjs las usa como línea base)
     local gen=telemetry/load.mjs; case " $* " in *" --rates "*) gen=telemetry/rate.mjs ;; esac
