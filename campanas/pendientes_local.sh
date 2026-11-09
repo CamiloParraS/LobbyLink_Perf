@@ -4,26 +4,26 @@
 #
 #   paso  qué cierra                                                   entorno          tiempo estimado
 #   p3    equivalencia del arreglo: mismas respuestas en los dos jars  PC (mongod)      ~5 min
-#   p2    F1 con contador de frecuencia por hilo (login en Windows)    PC, ambos jars   ~1 h 50 (6 endpoints × 360 s × 2 jars)
-#         y p6: F1 del PC con más de 30 muestras en los endpoints baratos (mismas corridas)
-#   p4    F7 en el contenedor, jar original, con -Xmx700m              docker           ~40 min
+#   p2    F1 con contador de frecuencia por hilo: login y listado     PC, jar original ~20 min (2 endpoints × 360 s)
+#   p4    F7 tráfico ×10 en el contenedor, jar original, -Xmx700m      docker           ~30 min
 #   p8    datos ×10 y ×100 (2.000 y 20.000 lobbies) con predicción     PC y docker      ~1 h 10
 #         escrita ANTES, jar corregido
 #   p9    datos que no caben en la caché (1,2 GB contra 512 MB)         docker           ~1 h 15 (necesita ~2 GB libres en C:)
 #   p7    techo de login (F6 con perfil login) y F6 con mezcla-postman  PC y docker      ~4 h
 #   p5    tercera repetición de F6 con el jar corregido                 PC y docker      ~2 h 20
-#   Total: ~11 h 20 min. Se puede partir en dos noches con SOLO.
+#   p6    F1 completo con más muestras, ambos jars                     PC               ~1 h 50
+#   Total: ~10 h. Antes de la entrega bastan p3 p2 p4 p8 (~2 h 10).
 #
 # Uso, desde Git Bash como ADMINISTRADOR (para fijar mongod), con el PC sin otros programas abiertos:
 #   cd lobbylink_perfv3 && nohup ./campanas/pendientes_local.sh > resultados/_logs/_pendientes.txt 2>&1 &
-#   SOLO="p3 p2 p4 p8" ./campanas/pendientes_local.sh        (primera noche, ~3 h 45)
-#   SOLO="p9 p7 p5"    ./campanas/pendientes_local.sh        (segunda noche, ~7 h 35)
+#   SOLO="p3 p2 p4 p8" ./campanas/pendientes_local.sh        (lo necesario para la entrega, ~2 h 10)
+#   SOLO="p9 p7 p5 p6" ./campanas/pendientes_local.sh        (opcional, ~9 h 20)
 # Estado: resultados/_logs/_pendientes_estado.txt. No se detiene si un paso falla: anota el código y sigue.
 set -u
 cd "$(dirname "$0")/.."
 EST=resultados/_logs/_pendientes_estado.txt; mkdir -p resultados/_logs
 log() { echo "$(date '+%F %T')  $*" | tee -a "$EST"; }
-SOLO=${SOLO:-p3 p2 p4 p8 p9 p7 p5}
+SOLO=${SOLO:-p3 p2 p4 p8 p9 p7 p5 p6}
 BASEJ=$(cygpath -w "$(pwd)/jars/disenofinal-base.jar"); FIXJ=$(cygpath -w "$(pwd)/jars/disenofinal-nplus1-fix.jar")
 
 mongod_listo() {   # el PC nativo usa el mongod de Windows en :27017
@@ -47,13 +47,13 @@ mongod_listo
 # p3: equivalencia de respuestas (una base nueva, dos arranques de la app)
 paso p3 "node telemetry/comparar_respuestas.mjs"
 
-# p2 + p6: F1 completo con el agente nuevo (cpu.perf / cpu.mhz) y 360 s por endpoint; tablas de frecuencia y modelo nuevo
-paso p2 "TAG=v3frec JAR='$BASEJ' F1_SEG=360 FASES=f1 ./campanas/campana.sh windows && TAG=v3fixfrec JAR='$FIXJ' F1_SEG=360 FASES=f1 ./campanas/campana.sh windows; \
-  node telemetry/frecuencia.mjs \$(ls -d resultados/*_windows_v3frec-f1-login resultados/*_windows_v3frec-f1-list resultados/*_windows_v3fixfrec-f1-login | tail -3) > resultados/_logs/frecuencia_windows_f1_$(date +%Y%m%d).md"
+# p2: F1 de login y listado con el agente nuevo (cpu.perf / cpu.mhz), 360 s cada uno; tabla de frecuencia por hilo
+paso p2 "TAG=v3frec JAR='$BASEJ' F1_OPS='login list' F1_SEG=360 FASES=f1 ./campanas/campana.sh windows; \
+  node telemetry/frecuencia.mjs \$(ls -d resultados/*_windows_v3frec-f1-login resultados/*_windows_v3frec-f1-list | tail -2) > resultados/_logs/frecuencia_windows_f1_$(date +%Y%m%d).md"
 
 docker_listo
 # p4: misma F7 del contenedor con el jar original, heap fijado en 700 MB (el contenedor sigue con 1 GB)
-paso p4 "TAG=v3xmx JAR='$BASEJ' JAVA_OPTS=-Xmx700m BASE_RPS=10 FASES=f7 ./campanas/campana.sh docker"
+paso p4 "TAG=v3xmx JAR='$BASEJ' JAVA_OPTS=-Xmx700m BASE_RPS=10 F7_CASOS=trafico FASES=f7 ./campanas/campana.sh docker"
 
 # p8: datos ×10 y ×100 con el jar corregido; f7d escribe la predicción con el F2 de v3fix antes de cada medición
 paso p8 "TAG=v3fix JAR='$FIXJ' BASE_RPS=10 DATOS_N='2000 20000' FASES=f7d ./campanas/campana.sh windows,docker"
@@ -68,5 +68,8 @@ paso p7 "TAG=v3fix JAR='$FIXJ' MEZCLA=login ESCALA='2 5 10 20 40 80' REPS=1 NO_P
 # p5: tercera repetición de F6 (semilla 3) con el jar corregido; el PC con su escala larga
 paso p5 "TAG=v3fix JAR='$FIXJ' ESCALA='5 10 20 40 80 160 320' REP_FROM=3 REPS=3 NO_PROPIO=1 FASES=f6 ./campanas/campana.sh windows; \
   TAG=v3fix JAR='$FIXJ' REP_FROM=3 REPS=3 NO_PROPIO=1 FASES=f6 ./campanas/campana.sh docker"
+
+# p6: F1 completo con 360 s por endpoint en los dos jars (más de 30 muestras en los endpoints baratos)
+paso p6 "TAG=v3frec6 JAR='$BASEJ' F1_SEG=360 FASES=f1 ./campanas/campana.sh windows && TAG=v3fixfrec JAR='$FIXJ' F1_SEG=360 FASES=f1 ./campanas/campana.sh windows"
 
 log "PENDIENTES TERMINADOS"

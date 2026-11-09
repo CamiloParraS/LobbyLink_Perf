@@ -31,7 +31,7 @@
 #   QUICK=1 (fases cortas: SOLO humo, no van al informe), STRICT=1 (cancela si el PC no está en reposo).
 #   Agregadas el 2026-11-09 (sin ellas todo se comporta como antes): JAR (otro jar en PC/contenedor, como campana_jar.sh),
 #   JAVA_OPTS (opciones de la JVM, p. ej. -Xmx700m; en docker van en JAVA_TOOL_OPTIONS), F1_OPS (endpoints de f1), F1_SEG (segundos de f1),
-#   REP_FROM (primera repetición de f6), NO_PROPIO=1 (f6 sin el nivel propio), DATOS_N y F2_DIRS / F1_VIEW_DIR (f7d, si el F2 está en otra carpeta),
+#   F7_CASOS ("trafico datos" por defecto; f7 solo corre los nombrados), REP_FROM (primera repetición de f6), NO_PROPIO=1 (f6 sin el nivel propio), DATOS_N y F2_DIRS / F1_VIEW_DIR (f7d, si el F2 está en otra carpeta),
 #   ESCALA9, T9, BULK_CALIENTE, BULK_FRIO, BULK_PAD (f9).
 set -u
 cd "$(dirname "$0")/.."   # raíz de lobbylink_perfv3
@@ -138,8 +138,8 @@ for env in $ENVS; do
     P=$R/_logs/prediccion_x10_${env}_$(date +%Y%m%d_%H%M%S).md   # se escribe ANTES de medir: la marca de tiempo lo prueba
     node telemetry/model.mjs $(f1dirs) $MP --base-rps $BASE_RPS ${NET_MBPS:+--net-mbps $NET_MBPS} ${DISK_IOPS:+--disk-iops $DISK_IOPS} > $P 2>&1; estado "predicción ×10 -> $P"
     X10=$(node -p "Math.round($BASE_RPS*10*10)/10")
-    corre $env "$(lb f7-trafico-x10)" --profile $MEZCLA --rates $BASE_RPS,$X10 --seconds $T6 --warm 30 --pause 60 --timeout 10
-    corre $env "$(lb f7-datos-x10)" --profile $MEZCLA --rates $BASE_RPS --lobbies 2000 --seconds $T6 --warm 30 --timeout 10 ;;
+    case " ${F7_CASOS:-trafico datos} " in *" trafico "*) ;; *) false ;; esac && corre $env "$(lb f7-trafico-x10)" --profile $MEZCLA --rates $BASE_RPS,$X10 --seconds $T6 --warm 30 --pause 60 --timeout 10
+    case " ${F7_CASOS:-trafico datos} " in *" datos "*) ;; *) false ;; esac && corre $env "$(lb f7-datos-x10)" --profile $MEZCLA --rates $BASE_RPS --lobbies 2000 --seconds $T6 --warm 30 --timeout 10 ;;
   f8)
     [ -n "${BASE_RPS:-}" ] || { estado "F8 $env: falta BASE_RPS"; continue; }
     corre $env "$(lb f8-largo)" --profile $MEZCLA --rates ${LARGO_RPS:-$BASE_RPS} --seconds $T8 --warm 30 --timeout 10 ;;
