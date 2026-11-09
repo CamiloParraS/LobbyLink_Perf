@@ -1,0 +1,29 @@
+# Entorno "contenedor con limites". Los limites son el experimento: cambialos con variables, no editando el archivo.
+#   APP_CPUS (def. 1)  APP_MEM (def. 1g)  MONGO_CPUS (def. 1)  MONGO_MEM (def. 1g)
+#   JAR_DIR  carpeta con el jar (def. ../../LobbyLink_backend/target)   DB  nombre de la base (nueva por corrida)
+# cpus=1 => cuota CFS: 100 ms de CPU por cada 100 ms; si los gasta antes, el kernel frena el contenedor (throttled_usec).
+name: lobbylink
+services:
+  mongo:
+    image: mongo:7
+    container_name: lobbylink-mongo
+    cpus: "${MONGO_CPUS:-1}"
+    mem_limit: "${MONGO_MEM:-1g}"
+    memswap_limit: "${MONGO_MEM:-1g}"
+    # solo para el agente (serverStatus cada 1-2 s); 27018 porque el mongod nativo de Windows ya usa 27017. La app sigue usando la red interna.
+    ports: ["127.0.0.1:27018:27017"]
+  app:
+    image: eclipse-temurin:21-jre
+    container_name: lobbylink-app
+    depends_on: [mongo]
+    volumes: ["${JAR_DIR:-../../LobbyLink_backend/target}:/app:ro"]
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017
+      SPRING_DATA_MONGODB_DATABASE: "${DB:-lobbylink_docker}"
+      # run.mjs pone aqui el registro de GC (-Xlog:gc:stdout:timemillis); queda en app.log via docker logs
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:-}"
+    ports: ["8080:8080"]
+    cpus: "${APP_CPUS:-1}"
+    mem_limit: "${APP_MEM:-1g}"
+    memswap_limit: "${APP_MEM:-1g}"
+    command: ["java", "-jar", "/app/${JAR_NAME:-disenofinal-0.0.1-SNAPSHOT.jar}"]

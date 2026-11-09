@@ -1,0 +1,3 @@
+{ "id": "solo-view", "name": "Solo ver un lobby (aislado)",
+  "mix": { "view": 100 },
+  "nota": "Aisla GET /api/lobbies/{id} (una consulta por peticion). Contraste de solo-list: misma app y misma base, la diferencia de CPU por peticion es el costo del N+1." }

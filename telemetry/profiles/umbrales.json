@@ -1,0 +1,2 @@
+{ "p95Ms": 1000, "errorRate": 0.01, "sensibilidadP95Ms": [300, 500, 1000],
+  "nota": "UNICO valor declarado (no medido) de v3: el requisito de latencia. Un nivel pasa si p95 <= p95Ms (medido desde la hora programada, con timeouts contados) y errores (5xx, red, timeout, descarte) <= errorRate. rate.mjs evalua ademas cada valor de sensibilidadP95Ms (passAt) para mostrar que la recomendacion no depende de haber elegido 1000 ms." }

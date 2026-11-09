@@ -1,0 +1,3 @@
+{ "id": "solo-list", "name": "Solo listar (aislado)",
+  "mix": { "list": 100 },
+  "nota": "Aisla GET /api/lobbies: con el agente, consultas de mongod / req/s = consultas por listado (N+1 => ~1 + lobbies) y CPU / req/s = ms de CPU por listado. Usar con pocos workers (p. ej. 1,5,10) y comparar con solo-view." }

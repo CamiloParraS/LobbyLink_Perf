@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LobbyLink v3 · Visor de corrida</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="visor">
+<header>
+  <h1>LobbyLink v3 · Visor de una corrida</h1>
+  <p class="sub" id="gen"></p>
+  <div class="bar">
+    <a class="chip" href="index.html">← Comparación entre entornos</a>
+    <div class="chips" id="envchips" aria-label="Entornos"></div>
+    <div class="chips" id="jarchips" aria-label="Versión del jar"></div>
+    <button class="chip theme" id="theme" type="button">Tema</button>
+  </div>
+  <div class="pick" id="pick"></div>
+</header>
+<nav><div class="tabs" id="tabs" role="tablist"></div></nav>
+<main id="main"></main>
+<div class="tip" id="tip"></div>
+<script src="data.js"></script>
+<script src="ui.js"></script>
+<script src="lib.js"></script>
+<script src="visor.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+{ "id": "solo-create", "name": "Solo crear lobby", "mix": { "create": 100 },
+  "nota": "F1. Insercion de lobby + participacion del creador: costo de escritura (journal de WiredTiger). Hace crecer la coleccion; por eso es una corrida aparte." }

@@ -1,0 +1,2 @@
+{ "id": "solo-register", "name": "Solo registro (BCrypt al crear la cuenta)", "mix": { "register": 100 },
+  "nota": "F1. Cada peticion crea una cuenta nueva (email unico): BCrypt + insercion en usuarios (escritura en el journal de mongod)." }

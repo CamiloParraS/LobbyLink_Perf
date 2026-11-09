@@ -1,0 +1,13 @@
+{
+  "id": "mezcla-postman",
+  "name": "Mezcla de la coleccion Postman",
+  "mix": {
+    "register": 1,
+    "login": 1,
+    "create": 1,
+    "list": 1,
+    "view": 1,
+    "join": 1
+  },
+  "origen": "LobbyLink_backend/LobbyLink_Postman_Collection.json: el recorrido documentado por el propio proyecto llama una vez a Register, Login, Create Lobby, List Lobbies, Get Lobby Detail y Join Lobby (carpetas 01 y 04). No es una frecuencia de uso real: es la mezcla que el proyecto documenta. Se usa para VALIDAR el modelo de costo (prediccion vs medicion) y como carga de comparacion; la capacidad para otras mezclas sale del modelo (model.mjs). OJO: 1 de cada 6 peticiones crea un lobby, asi que la coleccion crece durante la corrida y el listado (N+1 doble) se encarece con el tiempo; por eso la comparacion sostenida usa mezcla-lectura y esta mezcla va en la rampa y en una corrida de crecimiento."
+}

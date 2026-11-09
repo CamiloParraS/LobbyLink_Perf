@@ -1,0 +1,18 @@
+node_modules/
+*.bak*
+*.pid
+.env
+.claude/
+Screenshot*.png
+.DS_Store
+Thumbs.db
+
+# Datos crudos y binarios: se conservan en disco, no en el repositorio publico
+resultados/
+jars/
+# Generados por dashboard/build.mjs (se regeneran desde resultados/)
+dashboard/data.js
+dashboard/cache.json
+dashboard/runs/
+# Temporales
+*.tmp

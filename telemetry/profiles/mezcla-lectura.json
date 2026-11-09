@@ -1,0 +1,3 @@
+{ "id": "mezcla-lectura", "name": "Solo las lecturas de la coleccion Postman",
+  "mix": { "list": 1, "view": 1 },
+  "origen": "Las dos lecturas de lobbies de la coleccion Postman (List Lobbies, Get Lobby Detail), una vez cada una. No crea datos: la coleccion no crece y la carga es estable durante 10 min. Segunda mezcla para validar el modelo." }

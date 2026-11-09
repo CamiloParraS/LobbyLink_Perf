@@ -1,0 +1,2 @@
+{ "id": "solo-join", "name": "Solo unirse", "mix": { "join": 100 },
+  "nota": "F1. Recorre pares (usuario, lobby) sin repetir (lib/lobbylink.mjs), asi mide la union real y no el 400 de 'ya unido'. Con 20 usuarios x 200 lobbies hay 4.000 pares; a 1 worker alcanzan para ~2 min." }
