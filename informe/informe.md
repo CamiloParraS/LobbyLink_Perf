@@ -55,7 +55,7 @@ Cada corrida crea una base nueva con 1 videojuego, 20 usuarios y 200 lobbies de 
 
 Es un portátil con un AMD Ryzen 7 7445HS, de microarquitectura Zen 4, lanzado en 2023 y con un TDP de 35 W. Tiene 6 núcleos y 12 hilos. La ficha de AMD da 3,2 GHz de base y hasta 4,7 GHz de turbo. Nuestro microbenchmark, en `resultados/_microbench_ryzen_20261108/`, midió 4,7 GHz sostenidos en el núcleo 0. Un hilo fijado en los núcleos 1 a 3 se queda en 3,15 GHz bajo Windows. Cada núcleo tiene 64 KB de L1 y 1 MB de L2, que suman 6 MB, y los seis comparten 16 MB de L3. La latencia de acceso medida es 0,85 ns en L1, 2,96 ns en L2, de 10,7 a 14,8 ns en L3 y de 85,7 a 112,9 ns en RAM.
 
-Tiene 15,2 GB de RAM y un SSD NVMe de 512 GB. El disco da 41.903 IOPS en lectura aleatoria de 4 KiB, con 375 µs en p50, 1.488 IOPS de escritura con `fsync` y 1.306,8 MB/s en lectura secuencial. Corre Windows 11 Home, Oracle Java 25 y MongoDB 9.0.4, con una caché de WiredTiger de 7.287 MB.
+Tiene 15,2 GB de RAM visibles, en un solo módulo DDR5 de 16 GiB a 5.600 MT/s, es decir un solo canal de memoria. Lo leímos con `Get-CimInstance Win32_PhysicalMemory`, que da `SMBIOSMemoryType` 34, el código de DDR5. Tiene un SSD NVMe de 512 GB. El disco da 41.903 IOPS en lectura aleatoria de 4 KiB, con 375 µs en p50, 1.488 IOPS de escritura con `fsync` y 1.306,8 MB/s en lectura secuencial. Corre Windows 11 Home, Oracle Java 25 y MongoDB 9.0.4, con una caché de WiredTiger de 7.287 MB.
 
 LobbyLink no usa todo el equipo. `run.mjs` fija la app y `mongod` en los hilos 0 a 7, que son 4 núcleos físicos con SMT, y el generador en los hilos 8 a 11. El generador corre en la misma máquina, así que el tráfico va por loopback y no por una red.
 
@@ -190,7 +190,7 @@ Con el código corregido, ningún nivel de F6 ni de F7 falla en ninguna opción.
 - Las explicaciones de SMT, de la frecuencia y de la memoria salen de microbenchmarks de un hilo, no de contadores de hardware. No sabemos por qué Windows sostiene el turbo solo en el núcleo 0, ni qué causa el resto de la diferencia del login entre Windows y Linux.
 - En el PC, los endpoints baratos de F1 tienen de 10 a 13 muestras, menos de las 30 que pide el modelo. F6 con el código corregido tiene 2 repeticiones en el PC y en el contenedor. Las pendientes de créditos salen de 2 a 5 puntos de CloudWatch por nivel. La predicción de datos por diez la extrapolamos después de medir.
 - El costo del PC usa un precio, una vida útil y una tarifa de energía supuestos, y el TDP de ficha en lugar de un vatímetro. El costo de transferencia supone que toda la salida medida va a internet durante 730 h, sin compresión ni CDN.
-- El arreglo es nuestro y no tiene pruebas automáticas, porque `src/test` está vacío. Lo validamos con F1 a F8 y con la colección Postman.
+- El arreglo es nuestro y el proyecto no tiene pruebas automáticas, porque `src/test` está vacío. Lo validamos con F1 a F8, con la colección Postman y con una prueba de equivalencia, `telemetry/comparar_respuestas.mjs`. Esa prueba arranca los dos jars sobre la misma base y compara 95 respuestas, entre listados completos, listados filtrados por videojuego y detalles de 45 lobbies con 0 a 5 cupos libres, 13 de ellos llenos. Las 95 respuestas fueron idénticas campo por campo en la t3.small el 2026-11-09, en `resultados/_equivalencia_20261109_ec2/`.
 
 ## Datos crudos y guiones
 

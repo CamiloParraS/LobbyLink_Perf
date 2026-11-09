@@ -21,6 +21,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { add, summary } from './lib/hist.mjs';
 import { client, makeOps, picker, rng, seed } from './lib/lobbylink.mjs';
+import { bulkLobbies } from './lib/bulk.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const { values: a } = parseArgs({ options: {
@@ -28,6 +29,7 @@ const { values: a } = parseArgs({ options: {
   rates: { type: 'string', default: '10' }, seconds: { type: 'string', default: '600' }, warm: { type: 'string', default: '30' }, pause: { type: 'string', default: '15' },
   timeout: { type: 'string', default: '10' }, 'max-inflight': { type: 'string', default: '4000' }, 'stop-after-fail': { type: 'string', default: '0' },
   seed: { type: 'string', default: '1' }, users: { type: 'string', default: '20' }, lobbies: { type: 'string', default: '200' }, participants: { type: 'string', default: '1' },
+  bulk: { type: 'string', default: '0' }, 'bulk-pad': { type: 'string', default: '3000' }, mongo: { type: 'string' },   // f9: lobbies extra insertados directo en mongod (lib/bulk.mjs)
   env: { type: 'string', default: 'desconocido' }, out: { type: 'string' } } });
 const SECS = +a.seconds, WARM = +a.warm, TMO = +a.timeout * 1000, MAXINF = +a['max-inflight'], STOP = +a['stop-after-fail'];
 const RATES = a.rates.split(',').map(Number);
@@ -40,6 +42,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const { call, bytes } = client(a.base, TMO);
 const ctx = await seed(call, { users: +a.users, lobbies: +a.lobbies, participants: +a.participants, run: Date.now().toString(36) });
+if (+a.bulk > 0) {   // el mongod es el del servidor: por defecto el host de --base en el puerto 27017
+  ctx.bulk = await bulkLobbies({ mongo: a.mongo ?? `${new URL(a.base).hostname}:27017`, run: ctx.run, n: +a.bulk, pad: +a['bulk-pad'] });
+  ctx.info.bulk = ctx.bulk;
+}
 w({ t: 'meta', mode: 'rate', env: a.env, profile, thresholds: thr, base: a.base, rates: RATES, seconds: SECS, warm: WARM, timeoutMs: TMO, maxInflight: MAXINF, seed: +a.seed,
   startedAt: new Date().toISOString(), startedAtMs: Date.now(), baseRttMs: ctx.info.baseRttMs, node: process.version });
 w({ t: 'seed', ...ctx.info });

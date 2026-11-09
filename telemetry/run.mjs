@@ -31,6 +31,7 @@ const { values: a } = parseArgs({ options: {
   'app-cpus': { type: 'string', default: '1' }, 'app-mem': { type: 'string', default: '1g' }, 'mongo-cpus': { type: 'string', default: '1' }, 'mongo-mem': { type: 'string', default: '1g' },
   'idle-seconds': { type: 'string', default: '20' }, 'no-pin': { type: 'boolean', default: false }, 'server-only': { type: 'boolean', default: false },
   rates: { type: 'string' }, seed: { type: 'string', default: '1' }, timeout: { type: 'string', default: '10' }, 'stop-after-fail': { type: 'string', default: '0' }, 'max-inflight': { type: 'string', default: '4000' }, 'java-opts': { type: 'string', default: '' }, port: { type: 'string', default: '8080' },
+  bulk: { type: 'string', default: '0' }, 'bulk-pad': { type: 'string', default: '3000' },   // f9: lobbies en bloque directo en mongod (lib/bulk.mjs)
   lobbies: { type: 'string', default: '200' }, users: { type: 'string', default: '20' }, participants: { type: 'string', default: '1' }, 'no-gc-log': { type: 'boolean', default: false },
   'max-idle-cpu': { type: 'string', default: '5' }, 'strict-idle': { type: 'boolean', default: false }, // reposo: avisa si la CPU de la maquina supera el limite (%); --strict-idle cancela la corrida
   results: { type: 'string', default: 'resultados' } } }); // --results: subcarpeta de lobbylink_perfv3 (o ruta absoluta) donde se guarda la corrida (campañas nuevas no mezclan datos)
@@ -60,7 +61,7 @@ let stopApp = async () => {};
 try {
   // ---------- 1. arrancar la app contra una base nueva ----------
   if (a.env === 'docker') {
-    const env = { ...process.env, APP_CPUS: a['app-cpus'], APP_MEM: a['app-mem'], MONGO_CPUS: a['mongo-cpus'], MONGO_MEM: a['mongo-mem'], DB: db, JAVA_TOOL_OPTIONS: GC_LOG, JAR_DIR: dirname(a.jar), JAR_NAME: a.jar.split(/[\\/]/).pop() };
+    const env = { ...process.env, APP_CPUS: a['app-cpus'], APP_MEM: a['app-mem'], MONGO_CPUS: a['mongo-cpus'], MONGO_MEM: a['mongo-mem'], DB: db, JAVA_TOOL_OPTIONS: [GC_LOG, a['java-opts']].filter(Boolean).join(' '), JAR_DIR: dirname(a.jar), JAR_NAME: a.jar.split(/[\\/]/).pop() };
     log(`docker compose up (app ${a['app-cpus']} CPU / ${a['app-mem']}, mongo ${a['mongo-cpus']} CPU / ${a['mongo-mem']}, db ${db})`);
     spawnSync('docker', ['compose', '-f', join(ROOT, 'envs/compose.yml'), 'down', '-v'], { env, stdio: 'ignore' });
     const up = spawnSync('docker', ['compose', '-f', join(ROOT, 'envs/compose.yml'), 'up', '-d', '--force-recreate'], { env, encoding: 'utf8' });
@@ -110,7 +111,8 @@ try {
     // ---------- 4. carga ----------
     const common = ['--base', base, '--profile', a.profile, '--users', a.users, '--lobbies', a.lobbies, '--participants', a.participants, '--seconds', a.seconds, '--warm', a.warm, '--pause', a.pause, '--env', `${a.env}-${a.label}`, '--out', join(dir, 'load.ndjson')];
     const loadArgs = a.rates
-      ? [join(here, 'rate.mjs'), ...common, '--rates', a.rates, '--seed', a.seed, '--timeout', a.timeout, '--stop-after-fail', a['stop-after-fail'], '--max-inflight', a['max-inflight']]
+      ? [join(here, 'rate.mjs'), ...common, '--rates', a.rates, '--seed', a.seed, '--timeout', a.timeout, '--stop-after-fail', a['stop-after-fail'], '--max-inflight', a['max-inflight'],
+         ...(+a.bulk > 0 ? ['--bulk', a.bulk, '--bulk-pad', a['bulk-pad'], '--mongo', a.env === 'docker' ? '127.0.0.1:27018' : '127.0.0.1:27017'] : [])]
       : [join(here, 'load.mjs'), ...common, '--workers', a.workers];
     const load = spawn('node', loadArgs, { stdio: ['ignore', openSync(join(dir, 'load.txt'), 'a'), openSync(join(dir, 'load.err'), 'a')], windowsHide: true });
     writeFileSync(genPidFile, String(load.pid)); pin(load.pid, genMask, 'generador');

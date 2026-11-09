@@ -130,3 +130,13 @@ Salida: PC `resultados/<fecha>_<entorno>_<etiqueta>/`, con etiquetas `v3-f1-list
 - `index.html`: pestaña nueva “Entornos (hardware)”, enlaces al visor; `ui.js` es el código compartido.
 - Las corridas `v3fixnet-*` y `v3basenet-*` (red de Docker) ahora son la fase `FX` y ya no contaminan las medianas de F6 (antes se clasificaban como F6 del jar base).
 - Respaldos de la versión anterior: `app.js.bak-pre-visor`, `build.mjs.bak-pre-visor`, `app.css.bak-pre-visor`.
+
+## 10. Pruebas pendientes (2026-11-09)
+
+Cierran limitaciones de la sección 6 del informe. Nada sobrescribe corridas anteriores.
+
+- Hecho: equivalencia del arreglo N+1 (`telemetry/comparar_respuestas.mjs`): 95 respuestas idénticas en la t3.small, `resultados/_equivalencia_20261109_ec2/`. RAM del PC: un módulo DDR5 de 16 GiB a 5.600 MT/s.
+- En AWS (t3.small Unlimited i-0077b0b26e1e0cff0 y generador c7i-flex.large i-0c0cdd0fa3355982e, etiqueta `t3small-pend`): f9, que mide ver un lobby al azar con 20.000 lobbies en bloque, que caben en caché, contra 1.000.000 de ~3 KB, que no caben en RAM; y f7d, con datos de 2.000 y 20.000 lobbies y la predicción escrita antes en `resultados/_logs/prediccion_datos_ec2_20261109_104645.md`. Al terminar: `./campanas/recoger_ec2.sh 50.17.109.86 t3small-pend` y terminar las dos instancias.
+- En el PC, cuando esté libre: `campanas/pendientes_local.sh` (unas 11 h 20 en total, partible con `SOLO`). Agrega el contador de frecuencia por hilo (`win-sampler.ps1`, `telemetry/frecuencia.mjs`), F1 de 360 s, F7 del contenedor con `-Xmx700m`, f7d, f9 en Docker, F6 de login y de `mezcla-postman`, y la tercera repetición de F6 con el jar corregido.
+- Contadores de hardware: `setup/UPROF.md`.
+- Cambios en las herramientas: `campana.sh` acepta `JAR`, `JAVA_OPTS`, `F1_OPS`, `F1_SEG`, `REP_FROM`, `NO_PROPIO` y las fases `f7d` y `f9`; `run.mjs` pasa `--java-opts` también en Docker y acepta `--bulk`; `lib/bulk.mjs` inserta lobbies directo en mongod.

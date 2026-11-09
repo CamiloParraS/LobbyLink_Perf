@@ -14,6 +14,8 @@
 #   f6    tasa fija, MISMA escala en todas las máquinas, 600 s, REPS      tabla comparativa: CPU, RSS, IOPS, MB/s, red, p50/p95/p99
 #   f7    10 × BASE_RPS y datos ×10 a BASE_RPS (predicción escrita antes) "si la carga se multiplicara por diez"
 #   f8    BASE_RPS durante 40 min (pensada para la t3: créditos de CPU)   efectos de tiempo: créditos, crecimiento de memoria
+#   f7d   datos ×N (DATOS_N, def. "2000 20000") a BASE_RPS, con la predicción de F2 escrita ANTES (prediccion_datos.mjs)
+#   f9    solo ver un lobby al azar sobre lobbies en bloque: BULK_CALIENTE (cabe en caché) y BULK_FRIO (no cabe)  ¿cuándo importa el disco?
 #
 # PC (Git Bash; terminal de ADMINISTRADOR para fijar mongod):
 #   nohup ./campanas/campana.sh windows,docker > resultados/_logs/_campana.txt 2>&1 &
@@ -27,6 +29,10 @@
 #   APP_CPUS APP_MEM MONGO_CPUS MONGO_MEM (contenedor, def. 1 / 1g / 1 / 1g), CUOTAS (f4, def. "1x0.5 1x1 1x2 1x4 2x1 4x1"),
 #   MODEL_POOL (CPU para el modelo; t3 Standard: 0.4), LARGO_RPS (λ de f8; def. BASE_RPS),
 #   QUICK=1 (fases cortas: SOLO humo, no van al informe), STRICT=1 (cancela si el PC no está en reposo).
+#   Agregadas el 2026-11-09 (sin ellas todo se comporta como antes): JAR (otro jar en PC/contenedor, como campana_jar.sh),
+#   JAVA_OPTS (opciones de la JVM, p. ej. -Xmx700m; en docker van en JAVA_TOOL_OPTIONS), F1_OPS (endpoints de f1), F1_SEG (segundos de f1),
+#   REP_FROM (primera repetición de f6), NO_PROPIO=1 (f6 sin el nivel propio), DATOS_N y F2_DIRS / F1_VIEW_DIR (f7d, si el F2 está en otra carpeta),
+#   ESCALA9, T9, BULK_CALIENTE, BULK_FRIO, BULK_PAD (f9).
 set -u
 cd "$(dirname "$0")/.."   # raíz de lobbylink_perfv3
 FASES=${FASES:-f0 f1 f2 f3 f4 f5 f6}; REPS=${REPS:-3}; ESCALA=${ESCALA:-5 10 20 40 80}; MEZCLA=${MEZCLA:-mezcla-lectura}; TAG=${TAG:-v3}
@@ -35,7 +41,7 @@ CUOTAS=${CUOTAS:-1x0.5 1x1 1x2 1x4 2x1 4x1}
 # es la línea base de la ficha (t3.small: 2 vCPU × 20 % = 0.4); así la rampa F5 se centra en el techo real y F5 comprueba esa cifra.
 MP=${MODEL_POOL:+--pool $MODEL_POOL}
 if [ -n "${QUICK:-}" ]; then T1=30; T2=30; T3=20; T5=30; T6=60; T8=120; WU=10; else T1=120; T2=90; T3=60; T5=90; T6=600; T8=2400; WU=20; fi
-F1_OPS="list view login register create join"
+F1_OPS=${F1_OPS:-list view login register create join}; T1=${F1_SEG:-$T1}
 prof() { case $1 in login) echo login ;; *) echo solo-$1 ;; esac; }
 csv() { echo "$*" | tr ' ' ','; }
 
@@ -70,7 +76,7 @@ else
   corre() { local env=$1 lab=$2; shift 2; local extra=""
     [ $env = docker ] && { extra="--app-cpus ${ACPU:-${APP_CPUS:-1}} --app-mem ${APP_MEM:-1g} --mongo-cpus ${MCPU:-${MONGO_CPUS:-1}} --mongo-mem ${MONGO_MEM:-1g}"; limpiar; }
     estado "INICIO $env $lab"
-    node telemetry/run.mjs --env $env --label $lab "$@" ${STRICT:+--strict-idle} $extra --results $R > $R/_logs/_${env}_${lab}.txt 2>&1
+    node telemetry/run.mjs --env $env --label $lab "$@" ${STRICT:+--strict-idle} $extra ${JAR:+--jar "$JAR"} ${JAVA_OPTS:+"--java-opts=$JAVA_OPTS"} --results $R > $R/_logs/_${env}_${lab}.txt 2>&1
     local rc=$?; [ $env = docker ] && limpiar
     estado "FIN    $env $lab codigo=$rc"; sleep ${PAUSA:-120}; }
   ultimo() { ls -d $R/*_${1}_$2 2>/dev/null | tail -1; }
@@ -121,11 +127,11 @@ for env in $ENVS; do
     done
     node telemetry/model.mjs $(f1dirs) $MP --validate $(ultimo $env "$(lb f5-mezcla-lectura)") --validate $(ultimo $env "$(lb f5-mezcla-postman)") > $R/_logs/validacion_${env}_$(lb f5).md 2>&1 ;;
   f6)
-    for i in $(seq 1 $REPS); do
+    for i in $(seq ${REP_FROM:-1} $REPS); do
       corre $env "$(lb f6-$MEZCLA-r$i)" --profile $MEZCLA --rates $(csv $ESCALA) --seconds $T6 --warm 30 --pause 60 --stop-after-fail 1 --timeout 10 --seed $i
     done
     # y cada máquina al 50 % y 80 % de SU codo medido en f5 (qué le sobra cuando está holgada / casi llena)
-    K=$(node telemetry/knee.mjs $(ultimo $env "$(lb f5-$MEZCLA)") 2>/dev/null) && corre $env "$(lb f6-propio)" --profile $MEZCLA \
+    [ -z "${NO_PROPIO:-}" ] && K=$(node telemetry/knee.mjs $(ultimo $env "$(lb f5-$MEZCLA)") 2>/dev/null) && corre $env "$(lb f6-propio)" --profile $MEZCLA \
       --rates $(node -p "[0.5,0.8].map(f=>Math.round($K*f*10)/10).join(',')") --seconds $T6 --warm 30 --pause 60 --timeout 10 ;;
   f7)
     [ -n "${BASE_RPS:-}" ] || { estado "F7 $env: falta BASE_RPS (elegirlo con los datos de f6; ver docs/PLAN.md)"; continue; }
@@ -137,6 +143,18 @@ for env in $ENVS; do
   f8)
     [ -n "${BASE_RPS:-}" ] || { estado "F8 $env: falta BASE_RPS"; continue; }
     corre $env "$(lb f8-largo)" --profile $MEZCLA --rates ${LARGO_RPS:-$BASE_RPS} --seconds $T8 --warm 30 --timeout 10 ;;
+  f7d)
+    [ -n "${BASE_RPS:-}" ] || { estado "F7d $env: falta BASE_RPS"; continue; }
+    DN=${DATOS_N:-2000 20000}
+    F2D=${F2_DIRS:-$(for n in 100 200 400 800 1600; do ultimo $env "$(lb f2-list-$n)"; done)}; VD=${F1_VIEW_DIR:-$(ultimo $env "$(lb f1-view)")}
+    P=$R/_logs/prediccion_datos_${env}_$(date +%Y%m%d_%H%M%S).md   # se escribe ANTES de medir: la marca de tiempo lo prueba
+    node telemetry/prediccion_datos.mjs --view $VD --rps $BASE_RPS --lobbies $(csv $DN) $F2D ${MODEL_POOL:+--pool $MODEL_POOL} > $P 2>&1       || { estado "F7d $env: no se pudo predecir (¿faltan F2/F1 de $(lb f2)?): ver $P"; continue; }
+    estado "predicción de datos -> $P"
+    for n in $DN; do corre $env "$(lb f7d-datos-$n)" --profile $MEZCLA --rates $BASE_RPS --lobbies $n --seconds $T6 --warm 30 --timeout 10; done ;;
+  f9)
+    for caso in caliente:${BULK_CALIENTE:-20000} frio:${BULK_FRIO:-1000000}; do
+      corre $env "$(lb f9-${caso%%:*})" --profile solo-view --rates $(csv ${ESCALA9:-25 50 100 200 400}) --seconds ${T9:-300} --warm 30 --pause 30         --stop-after-fail 1 --timeout 10 --bulk ${caso#*:} --bulk-pad ${BULK_PAD:-3000}
+    done ;;
   *) estado "fase desconocida: $fase" ;;
   esac; done
 done

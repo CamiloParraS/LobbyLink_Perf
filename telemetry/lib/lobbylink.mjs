@@ -61,7 +61,8 @@ export function makeOps(call, ctx, rnd = Math.random) {
   const nPairs = () => ctx.tokens.length * ctx.ids.length;
   return {
     list: () => call('GET', '/api/lobbies', null, null, true),
-    view: () => call('GET', '/api/lobbies/' + pick(ctx.ids), null, pick(ctx.tokens), true),
+    // con siembra en bloque (f9), ver elige al azar entre los lobbies en bloque: el acceso aleatorio es el que no cabe en cache
+    view: () => call('GET', '/api/lobbies/' + (ctx.bulk?.n ? 'bk' + String(Math.floor(rnd() * ctx.bulk.n)).padStart(7, '0') : pick(ctx.ids)), null, pick(ctx.tokens), true),
     create: async () => { const r = await mkLobby(call, ctx, pick(ctx.tokens), true); if (r.json?.id) ctx.ids.push(r.json.id); return r; },
     join: () => { const k = pair++ % nPairs(), u = k % ctx.tokens.length, l = Math.floor(k / ctx.tokens.length);
       return call('POST', `/api/lobbies/${ctx.ids[l]}/join`, null, ctx.tokens[u], true); },

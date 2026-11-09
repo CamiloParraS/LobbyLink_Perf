@@ -9,8 +9,14 @@ function encodeDoc(obj) {
   const parts = [];
   for (const [k, v] of Object.entries(obj)) {
     const key = Buffer.from(k + '\0');
-    if (typeof v === 'number') { const b = Buffer.alloc(4); b.writeInt32LE(v); parts.push(Buffer.from([0x10]), key, b); }
+    if (typeof v === 'number' && Number.isInteger(v) && v >= -2147483648 && v <= 2147483647) { const b = Buffer.alloc(4); b.writeInt32LE(v); parts.push(Buffer.from([0x10]), key, b); }
+    else if (typeof v === 'number') { const b = Buffer.alloc(8); b.writeDoubleLE(v); parts.push(Buffer.from([0x01]), key, b); }
     else if (typeof v === 'string') { const s = Buffer.from(v + '\0'); const l = Buffer.alloc(4); l.writeInt32LE(s.length); parts.push(Buffer.from([0x02]), key, l, s); }
+    else if (typeof v === 'boolean') parts.push(Buffer.from([0x08]), key, Buffer.from([v ? 1 : 0]));
+    else if (v === null) parts.push(Buffer.from([0x0A]), key);
+    else if (v instanceof Date) { const b = Buffer.alloc(8); b.writeBigInt64LE(BigInt(v.getTime())); parts.push(Buffer.from([0x09]), key, b); }
+    else if (Array.isArray(v)) parts.push(Buffer.from([0x04]), key, encodeDoc(Object.fromEntries(v.map((x, i) => [String(i), x]))));
+    else if (typeof v === 'object') parts.push(Buffer.from([0x03]), key, encodeDoc(v));
     else throw new Error('tipo BSON no soportado: ' + typeof v);
   }
   const body = Buffer.concat([...parts, Buffer.from([0])]); const len = Buffer.alloc(4); len.writeInt32LE(body.length + 4);
