@@ -8,7 +8,7 @@ Medimos LobbyLink, una API REST de Spring Boot sobre MongoDB, en tres opciones: 
 
 La aplicación espera en la CPU, y la mayor parte de esa CPU la gasta `mongod`. En la t3.small, con el código original y 10 req/s, la máquina está ocupada el 48,2 % del tiempo con `iowait` de 0 %. `mongod` usa 62 % de un núcleo y la app 34 %. Los fallos de caché de WiredTiger son 0 %, así que el disco no participa. La causa está en el código: `GET /api/lobbies` hace dos consultas a la base por cada lobby que devuelve (patrón N+1). Cada petición de la mezcla examina 20.412 documentos en `mongod`. Con 20 req/s la t3.small ya no responde: 88,9 % de las peticiones vencen el tiempo límite de 10 s. El contenedor pasa 10 req/s y falla en 20. El PC pasa 20 req/s en las tres repeticiones, y 40 en dos de las tres.
 
-Corregimos el N+1 sin agregar índices: el conteo pasa a una sola agregación y los videojuegos se leen en una consulta. Con ese cambio cada petición examina 603 documentos, la CPU por petición baja de 96,67 ms a 10,05 ms y las tres opciones pasan los 80 req/s. En la t3.small, a 80 req/s, el p95 es 16,4 ms y la máquina está ocupada el 28,8 %. También pasa la prueba de ×10: 100 req/s con p95 de 16 ms, y 2.000 lobbies con p95 de 62 ms.
+Corregimos el N+1 sin agregar índices: el conteo pasa a una sola agregación y los videojuegos se leen en una consulta. Con ese cambio cada petición examina 603 documentos, la CPU por petición baja de 96,67 ms a 10,05 ms y las tres opciones pasan los 80 req/s. En la t3.small, a 80 req/s, el p95 es 16,4 ms y la máquina está ocupada el 28,8 %. También pasa la prueba de ×10: 100 req/s con p95 de 16 ms, y 2.000 lobbies con p95 de 62 ms. Con 20.000 lobbies, cien veces los datos, falla el 100 % de las peticiones por falta de memoria, no de CPU, porque el listado sin paginar arma en la JVM una respuesta con todos los lobbies. El disco tampoco limita cuando los datos no caben en memoria: con 1.000.000 de lobbies (3.117 MB) y 400 req/s hace 365 IOPS, el 12 % de lo que midió F0 (capítulo 9.1).
 
 Recomendamos desplegar LobbyLink con el arreglo del N+1 en una EC2 t3.small en modo Unlimited. Con el arreglo, hasta 40 req/s no supera la línea base de CPU que incluye su precio y cuesta 16,78 USD al mes con disco. A 80 req/s usa 28,8 % de su CPU y los créditos excedentes medidos en CloudWatch suben la infraestructura a 21,26 USD al mes. Con clientes en internet y carga sostenida, la transferencia de salida sube el total a 47,81 USD a 10 req/s, 167,80 a 40 y 334,74 a 80 (capítulo 8.1). Con el código original, servir solo 10 req/s ya cuesta 35,91 USD al mes, porque los créditos excedentes (19,13 USD) superan el precio de la instancia. Sin el arreglo, ninguna de las tres opciones resiste ×10, así que cambiar de máquina no resuelve el problema.
 
@@ -159,6 +159,7 @@ Las fases dependen unas de otras en este orden.
 4. F6 es la comparación entre opciones. Usa la misma escala absoluta (5, 10, 20, 40 y 80 req/s) en las tres máquinas, 600 s por nivel y tres repeticiones con semillas distintas.
 5. F7 multiplica por diez el tráfico y, en otra corrida, los datos. Antes de medir escribimos la predicción en un archivo con marca de tiempo.
 6. F8 sostiene una carga 40 min o más para ver efectos que solo aparecen con el tiempo: los créditos de la t3 y el crecimiento de la memoria.
+7. F7d repite el escenario de datos de F7 con la predicción escrita antes de medir, y lo extiende a cien veces los datos. F9 prueba qué pasa cuando la base no cabe en la caché de WiredTiger. Las dos se agregaron el 2026-11-09 y por ahora solo corrieron en la t3.small con el jar arreglado.
 
 F0 (sondas de disco y red), F2 (costo del listado contra el tamaño de los datos), F3 (Amdahl) y F4 (cuotas del contenedor) explican los resultados, pero no deciden la recomendación.
 
@@ -221,6 +222,8 @@ Todos los valores están en `campanas/campana.sh`, que corre las mismas fases en
 | F6 | Tasa fija | 600 s por nivel, 30 s de calentamiento, 60 s de pausa | 5, 10, 20, 40 y 80 req/s en las tres opciones; 3 repeticiones con semillas 1, 2 y 3. Se detiene tras el primer nivel fallido. Además cada opción al 50 % y 80 % de su codo de F5 (`f6-propio`, codo calculado con `knee.mjs`) |
 | F7 | Tasa fija | 600 s por nivel | BASE_RPS = 10 y 10 × BASE_RPS = 100 req/s; luego 10 req/s con 2.000 lobbies. Predicción en `resultados/_logs/prediccion_x10_<entorno>_<fecha>.md`, escrita antes de medir |
 | F8 | Tasa fija | 2.400 s (Unlimited) y 5.400 s (Standard) | t3.small Unlimited a 10 req/s; Standard a 23 req/s para agotar los créditos en un tiempo medible |
+| F7d | Tasa fija, `mezcla-lectura` | 600 s por tamaño | 10 req/s con 2.000 y 20.000 lobbies, jar arreglado. Predicción de `telemetry/prediccion_datos.mjs` con el ajuste de F2 (app y `mongod` por separado) más ver de F1, escrita antes en `_logs/prediccion_datos_<entorno>_<fecha>.md` |
+| F9 | Tasa fija, solo ver un lobby al azar | 300 s por nivel | 25, 50, 100, 200 y 400 req/s; se detiene en el primer nivel que falla. Lobbies insertados en bloque (`lib/bulk.mjs`) con ~3 KB de relleno aleatorio y estado cancelado: 20.000 (62 MB, caben) contra 1.000.000 (3.117 MB, no caben en 1,9 GiB) |
 
 ### 3.8 Cómo repetir las mediciones
 
@@ -440,11 +443,11 @@ Una petición puede esperar por CPU, disco, red o memoria. Para cada recurso com
 
 **CPU que no entrega el hipervisor.** En modo Standard sin créditos, la espera por CPU aparece como `steal`. A 10 req/s el agente midió `steal` 78,8 % y `us` 16,8 %. La instancia pide CPU y el hipervisor le entrega solo la línea base del 20 %. A 2 req/s el `steal` es 0,0 % y el nivel pasa con p95 de 210 ms. A 5 req/s sube a 48,5 % y falla con 52,7 % de errores (carpetas `ec2_t3small-std-thr*`). En Unlimited el `steal` promedio queda entre 0,1 % y 1,2 % en todos los niveles de F6.
 
-**Disco.** No participa. La t3.small hace 1 IOPS en promedio en todos los niveles de F6 y en los 40 minutos de F8, casi todo escrituras (1,0 de escritura contra 0,3 de lectura por segundo en F8 con el jar base), con 0,01 MB/s. Son las escrituras periódicas del journal y los checkpoints de WiredTiger. Frente a lo que midió F0, eso es el 0,03 % de las 3.049 IOPS de lectura y el 0,3 % de las 354 escrituras con `fsync` por segundo. La caché de WiredTiger tiene 0 % de fallos y lee 0 MB/s del disco, porque los datos ocupan unos 10 MB de los 440 MB configurados. El disco por red de EBS, que es unas 27 veces más lento que el NVMe del PC en lectura aleatoria (10.027 contra 375 µs en p50), no afecta a LobbyLink con estos datos. Dejaría de ser así si los datos no cupieran en la caché.
+**Disco.** No participa. La t3.small hace 1 IOPS en promedio en todos los niveles de F6 y en los 40 minutos de F8, casi todo escrituras (1,0 de escritura contra 0,3 de lectura por segundo en F8 con el jar base), con 0,01 MB/s. Son las escrituras periódicas del journal y los checkpoints de WiredTiger. Frente a lo que midió F0, eso es el 0,03 % de las 3.049 IOPS de lectura y el 0,3 % de las 354 escrituras con `fsync` por segundo. La caché de WiredTiger tiene 0 % de fallos y lee 0 MB/s del disco, porque los datos ocupan unos 10 MB de los 440 MB configurados. El disco por red de EBS, que es unas 27 veces más lento que el NVMe del PC en lectura aleatoria (10.027 contra 375 µs en p50), no afecta a LobbyLink con estos datos. F9 probó qué pasa cuando los datos no caben: con 1.000.000 de lobbies y 400 req/s el disco llega a 365 IOPS, el 12 % de lo que puede dar, y la CPU sigue llenándose primero (capítulo 9.1).
 
 **Red.** Tampoco limita. La salida es 0,17 MB/s a 10 req/s y 1,39 MB/s a 80 req/s, unos 17,4 KB por petición, que es el tamaño medio de las respuestas (34,6 KB el listado de 200 lobbies y 0,6 KB ver). Contra los 4.953 Mbit/s (619 MB/s) que midió `iperf3`, 1,39 MB/s es el 0,22 %. Haría falta multiplicar la tasa por unas 450 para llenar la red, y antes se acabaría la CPU. El tráfico entre la app y `mongod` no sale de la máquina en ninguna opción. Va por loopback o por la red interna de Docker.
 
-**Memoria.** Sobra mientras el nivel pasa. En la t3.small el RSS de la app es 260 MB y el de `mongod` 189 MB a 10 req/s con el jar base, 449 MB de 1.905 MB. La JVM pasa el 0,42 % del tiempo en pausas del GC, sin pausas completas, con 43 MB de heap vivo tras cada GC. En los 40 minutos de F8 el RSS de la app sube de 310 a 324 MB con el jar base y de 237 a 245 MB con el arreglado, y el de `mongod` baja (de 205 a 174 MB y de 165 a 162 MB). No vemos una fuga en ese tiempo. La memoria solo crece cuando un nivel colapsa, porque las peticiones esperan en memoria. La app llega a 511 MB en la t3.small a 20 req/s, con 192 MB de heap vivo y 2,74 % del tiempo en pausas. En el contenedor, con 1 GB de límite, la app llega a 398 MB en el colapso, lejos del límite. En la t3.small Standard, la corrida de F8 que colapsó durante 90 minutos llevó la app de 452 a 721 MB.
+**Memoria.** Sobra mientras el nivel pasa. En la t3.small el RSS de la app es 260 MB y el de `mongod` 189 MB a 10 req/s con el jar base, 449 MB de 1.905 MB. La JVM pasa el 0,42 % del tiempo en pausas del GC, sin pausas completas, con 43 MB de heap vivo tras cada GC. En los 40 minutos de F8 el RSS de la app sube de 310 a 324 MB con el jar base y de 237 a 245 MB con el arreglado, y el de `mongod` baja (de 205 a 174 MB y de 165 a 162 MB). No vemos una fuga en ese tiempo. La memoria solo crece cuando un nivel colapsa, porque las peticiones esperan en memoria. La app llega a 511 MB en la t3.small a 20 req/s, con 192 MB de heap vivo y 2,74 % del tiempo en pausas. En el contenedor, con 1 GB de límite, la app llega a 398 MB en el colapso, lejos del límite. En la t3.small Standard, la corrida de F8 que colapsó durante 90 minutos llevó la app de 452 a 721 MB. La memoria sí limita con 20.000 lobbies, aunque la CPU sobre: el listado sin paginar no cabe en el heap de la JVM (capítulo 9.1).
 
 En resumen, LobbyLink espera por CPU y por nada más. Con el jar base la mayor parte de esa CPU la gasta `mongod` en las consultas del N+1. El disco y la red usan menos del 1 % de lo que midió F0, y la memoria menos de un cuarto de la RAM de la t3.small mientras el nivel pasa. Por eso el criterio para elegir máquina es la CPU por dólar, y el capítulo 8 compara sobre esa base.
 
@@ -653,6 +656,37 @@ Fuentes: `load.txt` de las carpetas `*_f7-datos-x10` y `ec2_t3small-unl*/f7-dato
 
 Con el jar base, diez veces más datos hacen tanto daño como diez veces más tráfico. Las tres opciones responden 0,08 req/s de las 10 pedidas. En el contenedor el heap vuelve a ser la barrera, ahora con el 77,3 % del tiempo en GC completos. La t3.small no muestra ese problema porque su JVM ve 1,9 GB y toma un heap de 478 MB, con 2 vCPU y otro recolector. Con el jar arreglado las tres opciones pasan los dos escenarios. El p95 con 2.000 lobbies es el doble que con 200 (45 a 62 ms contra 20 a 22 ms), porque cada respuesta lleva 10 veces más lobbies.
 
+### 9.1 Datos ×10 y ×100 con predicción previa (F7d) y datos que no caben en memoria (F9)
+
+Estas dos fases corrieron el 2026-11-09 en una t3.small Unlimited nueva, con el jar arreglado y el generador en una c7i-flex.large aparte. Las instancias ya están terminadas.
+
+**F7d.** `telemetry/prediccion_datos.mjs` escribió la predicción a las 17:01:01 UTC, en el mismo segundo en que `_campana_estado.txt` marca el inicio de la primera corrida y antes de sembrar sus datos. Toma el barrido F2 de la t3.small, ajusta D_list(N) = c · N^b por separado para la app (b = 0,646) y para `mongod` (b = 0,636), le suma ver un lobby de F1 (2,76 + 2,02 ms) y predice la utilización a 10 req/s con 50 % de listados.
+
+| Lobbies, 10 req/s | D del listado predicho (app + `mongod`) | Utilización predicha | Medido | p95 y errores |
+| --- | --- | --- | --- | --- |
+| 2.000 | 21,4 + 11,2 = 32,7 ms | 9 % | CPU 14 % | p50 34,5 ms, p95 59,8 ms, 0 errores |
+| 20.000 | 94,8 + 48,6 = 143,4 ms | 37 % | 0 req/s logradas | 10.181 ms (tope del timeout), 100 % de errores |
+| 20.000 con `-Xmx1g` | igual | 37 % | Java muerto por el kernel a los 30 s de carga | 100 % de errores (conexión rechazada, p50 1,7 ms) |
+
+Fuentes: `ec2_t3small-pend/_logs/prediccion_datos_ec2_20261109_170101.md`, `ec2_t3small-pend/f7d-datos-2000/`, `ec2_t3small-pend/f7d-datos-20000/` y `ec2_t3small-xmx/f7d-datos-20000/`.
+
+Con 2.000 lobbies la predicción acierta el resultado y se queda corta 5 puntos en la utilización, como en F5. Con 20.000 la predicción de CPU puede ser razonable, pero no importa, porque se acaba otro recurso. La JVM tomó por defecto un heap de 478 MB, un cuarto de la RAM. Con 2.000 lobbies cada listado pesa unos 340 KB de JSON (1,68 MB/s de salida entre unos 5 listados por segundo), así que con 20.000 serían unos 3,4 MB por respuesta, más los objetos que la JVM arma para producirla. `app.log` registra 95 pausas Full GC y 4 `OutOfMemoryError`. Uno de ellos mató el hilo `http-nio-8080-Poller` de Tomcat, el que acepta conexiones, y desde ahí fallaron también las peticiones de ver un lobby. Con `-Xmx1g` el heap deja de ser el tope, pero la máquina no tiene esa memoria: la app llegó a 949 MB residentes con `mongod` en unos 580 MB, y el kernel mató a Java. El modelo de capacidad solo mira CPU, así que no podía prever este fallo. La conclusión es que la t3.small vale mientras la base tenga pocos miles de lobbies abiertos, y antes de 20.000 hay que paginar `GET /api/lobbies`. No medimos esa paginación.
+
+**F9.** Mide cuándo empieza a importar el disco. La carga pide un lobby al azar por su id, porque recorrer la base entera con el listado tardaría minutos por petición. La base que cabe tiene 20.000 lobbies (62 MB). La que no cabe tiene 1.000.000 (3.117 MB de datos y 12,8 MB de índices) contra 1,9 GiB de RAM y 440 MB de caché de WiredTiger.
+
+| 400 req/s | Cabe (20.000) | No cabe (1.000.000) |
+| --- | --- | --- |
+| Fallos de caché de WiredTiger | 0 % | 12-14 % |
+| IOPS del disco | 1 | 365 (12 % de las 3.049 de F0), 12,9 MB/s |
+| `wa` y utilización del volumen | 0 % | 3,4 % y 21 % |
+| CPU de la máquina | 72 % | 72 % |
+| p50 / p95 / p99 | 7,2 / 28,4 / 581 ms | 8,4 / 121 / 1.089 ms |
+| Errores | 0 | 0 |
+
+Fuentes: `ec2_t3small-pend/f9-caliente/` y `ec2_t3small-pend/f9-frio/`. Los cinco niveles pasan en las dos bases.
+
+Son 0,9 lecturas de disco por petición. Cada una cuesta unos 10 ms en el EBS (p50 de F0), y eso explica que suba la cola de la latencia y no la mediana: el p50 sube 1,2 ms y el p95 cuatro veces. Aun así el disco trabaja al 12 % de sus IOPS cuando la CPU ya está al 72 %, así que con esta carga el núcleo se llena antes. El caso que F9 no cubre es un recorrido completo de una base que no cabe, como el listado sin filtro sobre millones de lobbies: ahí cada petición leería miles de páginas a 10 ms cada una. El contenedor con `mongod` limitado a 512 MB está pendiente.
+
 ## 10. El arreglo del N+1
 
 El arreglo cambia dos métodos de `LobbyServiceImpl` (`LobbyLink_backend_nplus1/`). En lugar de un conteo por lobby, cuenta los participantes de todos los lobbies con una agregación. En lugar de buscar el videojuego de cada lobby, los busca todos juntos con `findAllById`. No agrega índices ni cambia el modelo de datos ni la respuesta de la API. Lo medimos con el mismo protocolo que el jar original, cambiando solo el jar (`--jar`).
@@ -678,7 +712,7 @@ El arreglo también cambia qué limita. Con el jar base limita `mongod` (58-75 %
 
 ## 11. Recomendación y opción descartada
 
-Recomendamos desplegar LobbyLink con el jar arreglado en una EC2 t3.small en modo Unlimited, con 20 GiB de EBS gp3, en us-east-1. La infraestructura cuesta 16,78 USD al mes hasta 40 req/s y 21,26 USD a 80 req/s, con los créditos medidos en CloudWatch, y con transferencia a internet el total es 47,81 USD a 10 req/s, 167,80 a 40 y 334,74 a 80 (capítulo 8.1). A 80 req/s la CPU queda en 28,8 %, por debajo del 60 % de la regla, con p95 de 16 ms y 0 errores en 3 repeticiones. A 1.000 peticiones cuesta 0,00010 USD, o 0,0016 USD con transferencia.
+Recomendamos desplegar LobbyLink con el jar arreglado en una EC2 t3.small en modo Unlimited, con 20 GiB de EBS gp3, en us-east-1. La infraestructura cuesta 16,78 USD al mes hasta 40 req/s y 21,26 USD a 80 req/s, con los créditos medidos en CloudWatch, y con transferencia a internet el total es 47,81 USD a 10 req/s, 167,80 a 40 y 334,74 a 80 (capítulo 8.1). A 80 req/s la CPU queda en 28,8 %, por debajo del 60 % de la regla, con p95 de 16 ms y 0 errores en 3 repeticiones. A 1.000 peticiones cuesta 0,00010 USD, o 0,0016 USD con transferencia. La recomendación vale mientras la base tenga pocos miles de lobbies abiertos: con 2.000 pasa y con 20.000 falla por memoria (capítulo 9.1), así que antes de llegar a ese tamaño hay que paginar `GET /api/lobbies`.
 
 Si hubiera que desplegar el código original, la recomendación sería la misma instancia, pero solo hasta 10 req/s (CPU 48,2 %), por 35,91 USD al mes (67,02 USD con transferencia). Más de la mitad de la infraestructura son créditos. Antes de pagar una máquina más grande para el código original, conviene aplicar el arreglo.
 
@@ -693,7 +727,7 @@ Las cuatro preguntas de la sustentación tienen esta respuesta corta.
 
 1. **¿Qué limita a LobbyLink?** La CPU. En la t3.small con el jar base a 10 req/s, `us` es 39,9 % con `wa` 0,0 %, el disco hace 1 IOPS contra las 354 escrituras con `fsync` por segundo medidas en F0 y la red usa el 0,03 % de lo que midió `iperf3`. Dos tercios de esa CPU los gasta `mongod` en las consultas del N+1.
 2. **¿Qué opción conviene?** La t3.small Unlimited con el jar arreglado, por 16,78 a 21,26 USD al mes de infraestructura hasta 80 req/s, o de 47,81 a 334,74 USD con transferencia a internet entre 10 y 80 req/s.
-3. **¿Qué pasa si la carga se multiplica por diez?** Con el jar base, las tres opciones colapsan con tráfico ×10 y con datos ×10, como predijo F1. Con el arreglado, la t3.small atiende 100 req/s con 34 % de CPU y 2.000 lobbies con p95 de 62 ms.
+3. **¿Qué pasa si la carga se multiplica por diez?** Con el jar base, las tres opciones colapsan con tráfico ×10 y con datos ×10, como predijo F1. Con el arreglado, la t3.small atiende 100 req/s con 34 % de CPU y 2.000 lobbies con p95 de 62 ms. Con cien veces los datos, 20.000 lobbies, se rompe la memoria de la JVM y no la CPU.
 4. **¿Qué parte del hardware explica cada resultado?** El capítulo 6 relaciona cada número medido con su componente: el núcleo con SMT, la cuota CFS, la línea base de créditos, la caché de WiredTiger y el heap de la JVM.
 
 ## 12. Limitaciones
@@ -716,13 +750,14 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - Las corridas del contenedor anteriores al 2026-11-07 registraron la red en 0 por un error del agente. Repetimos un nivel de F6 de cada jar con el agente corregido.
 - No medimos la explicación de SMT y BCrypt con contadores de hardware (capítulo 4.3).
 - Las pendientes de créditos de la t3.small salen de 2 a 5 puntos de CloudWatch por nivel (capítulo 8.1).
-- La predicción de datos ×10 de F7 la extrapolamos después de medir (capítulo 9).
+- La predicción de datos ×10 de F7 la extrapolamos después de medir (capítulo 9). F7d la repitió con la predicción escrita antes, pero por ahora solo en la t3.small (capítulo 9.1).
 
 **Carga y datos.**
 
 - `mezcla-lectura` no incluye escrituras ni BCrypt. `mezcla-postman` sí, y su codo queda al 51-71 % del techo (capítulo 4.5).
 - Cada lobby sembrado tiene un participante, y 200 lobbies es un tamaño que declaramos nosotros. El capítulo 4.2 muestra que la recomendación no cambia entre 100 y 1.600 lobbies.
-- Los datos siempre cupieron en la caché de WiredTiger (0 % de fallos). No probamos un caso donde no quepan, y ahí el disco de EBS pasaría a importar (capítulo 5).
+- En F1 a F8 los datos cupieron en la caché de WiredTiger (0 % de fallos). F9 probó una base que no cabe, pero solo en la t3.small y pidiendo un lobby a la vez. Ahí el disco no limitó. Un recorrido completo de una base que no cabe sí dependería de los 10 ms por lectura del EBS (capítulo 9.1).
+- El listado no tiene paginación, y con 20.000 lobbies la t3.small se queda sin memoria. No medimos una versión paginada.
 
 **Costos.**
 
@@ -730,7 +765,7 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - El costo del PC usa un precio, una vida útil y una tarifa de energía declarados por nosotros, y la potencia es el TDP de ficha (35 W). No medimos la potencia con un vatímetro. Lo convertimos a dólares con la TRM del 2026-11-08.
 - La transferencia a internet supone que toda la salida medida sale de AWS durante las 730 h, sin compresión ni CDN.
 
-**Código.** El arreglo del N+1 es nuestro, no del autor de LobbyLink. Lo probamos con F1 a F8 y con la colección de Postman, pero no con las pruebas del proyecto, porque `src/test` está vacío.
+**Código.** El arreglo del N+1 es nuestro, no del autor de LobbyLink. Lo probamos con F1 a F8 y con la colección de Postman, pero no con las pruebas del proyecto, porque `src/test` está vacío. Además `telemetry/comparar_respuestas.mjs` arrancó los dos jars sobre la misma base y comparó 95 respuestas (listados completos, listados filtrados por videojuego y detalles de 45 lobbies con 0 a 5 cupos libres, 13 de ellos llenos). Las 95 fueron idénticas campo por campo en la t3.small el 2026-11-09 (`resultados/_equivalencia_20261109_ec2/`).
 
 ## Anexos
 
@@ -752,6 +787,8 @@ Todas las rutas son relativas a `lobbylink_perfv3/resultados/`. Cada corrida tie
 | 8, costos | `_aws_precios_20261107/precios.md`, `_aws_costos_20261106/`, `_aws_costos_20261107/costos_consola.md`, `_logs/creditos_ec2_unl_20261107.md` |
 | 9, F7 | `_logs/prediccion_x10_*.md`, carpetas `*_f7-*`, `ec2_t3small-unl*/f7-*`, `ec2_t3small-unl*/_logs/prediccion_x10_ec2_*.md` |
 | 5 y 8.1, F8 | `ec2_t3small-unl/f8-largo`, `ec2_t3small-unl-nplus1/f8-largo` y las carpetas `f8*` de `ec2_t3small-std*` |
+| 9.1, F7d y F9 | `ec2_t3small-pend/` (`f7d-datos-2000`, `f7d-datos-20000`, `f9-caliente`, `f9-frio`, `_logs/prediccion_datos_ec2_20261109_170101.md`), `ec2_t3small-xmx/f7d-datos-20000` |
+| 12, equivalencia | `_equivalencia_20261109_ec2/` |
 
 ### B. Comandos para reproducir
 
@@ -768,6 +805,8 @@ BASE_RPS=10 FASES="f7" ./campanas/campana.sh windows,docker
 ./campanas/campana.sh ec2 <IP_PRIVADA_SERVIDOR> <etiqueta>
 # y después, en el PC, traer los resultados
 ./campanas/recoger_ec2.sh <IP_PUBLICA_GENERADOR> <etiqueta> [llave.pem]
+# F9 y F7d en la nube (en el generador; el servidor debe tener el jar arreglado, ver setup/EC2.md)
+FASES="f9 f7d" ./campanas/campana.sh ec2 <IP_PRIVADA_SERVIDOR> <etiqueta>
 # Regenerar las tablas de una corrida
 node telemetry/report.mjs resultados/<carpeta>
 ```

@@ -83,7 +83,7 @@ De F6 salen todas las métricas de la tabla de resultados.
 **F9, datos que no caben en la caché.** Responde cuándo empieza a importar el disco. En todas las fases anteriores la base cabe en la caché de WiredTiger, el motor de almacenamiento de MongoDB, así que el disco no trabaja.
 
 - **Siembra.** F9 inserta los lobbies directamente en `mongod`, porque crearlos por la API tomaría horas. Cada uno lleva unos 3 KB de texto aleatorio que la compresión casi no reduce. Están cancelados para que el listado no los devuelva.
-- **Bases comparadas.** Una base de 20.000 lobbies, unos 60 MB, cabe en la caché. La otra no cabe. En el contenedor tiene 400.000 lobbies, unos 1,2 GB, con `mongod` limitado a 512 MB, de los que WiredTiger toma 256 MB. En la t3.small tiene 1.000.000 de lobbies, unos 3 GB, frente a 1,9 GiB de RAM.
+- **Bases comparadas.** Una base de 20.000 lobbies, unos 60 MB, cabe en la caché. La otra no cabe. En el contenedor tiene 400.000 lobbies, unos 1,2 GB, con `mongod` limitado a 512 MB, de los que WiredTiger toma 256 MB, pero esa corrida aún no la hacemos. En la t3.small tiene 1.000.000 de lobbies, unos 3 GB, frente a 1,9 GiB de RAM.
 - **Carga.** Solo pide lobbies al azar por su id, de 25 a 400 req/s, con 300 s por nivel, y se detiene en el primer nivel que falla. Cuando los datos no caben, muchas peticiones tienen que leer del disco, y deberían aparecer IOPS y `wa` distintos de cero.
 
 **Cuándo pasa un nivel.** Un nivel pasa si el p95 es de 1.000 ms o menos y los errores no superan el 1 %. Los dos valores están en `telemetry/profiles/umbrales.json`. El límite de 1.000 ms lo declaramos nosotros. Con el código corregido ningún nivel cambia de resultado si el límite es 300 o 500 ms. Para recomendar una opción a una tasa pedimos además que su recurso más ocupado quede en promedio al 60 % de su capacidad o menos, y dejamos el resto como margen.
@@ -239,7 +239,7 @@ Con el código corregido, ningún nivel de F6 ni de F7 falla en ninguna opción.
 
 ## Datos crudos y guiones
 
-- **Datos crudos.** Están en `lobbylink_perfv3/resultados/`, una carpeta por corrida. Las tablas del modelo, la validación y los créditos están en `resultados/_logs/`. Los precios de AWS y lo que cobró la consola están en `resultados/_aws_*`.
+- **Datos crudos.** Están en `lobbylink_perfv3/resultados/`, una carpeta por corrida. Las tablas del modelo, la validación y los créditos están en `resultados/_logs/`. Los precios de AWS y lo que cobró la consola están en `resultados/_aws_*`. F9 y F7d de la t3.small están en `resultados/ec2_t3small-pend/`, y la repetición de 20.000 lobbies con `-Xmx1g` en `resultados/ec2_t3small-xmx/`.
 - **Guiones.** Son `campanas/campana.sh`, `campanas/campana_jar.sh` y la carpeta `telemetry/`.
 - **Visor.** `dashboard/index.html` muestra todas las corridas.
 - **Índice y comandos.** El anexo A del anexo técnico une cada sección con sus carpetas, y el anexo B da los comandos para repetir cada fase.

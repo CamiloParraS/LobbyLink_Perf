@@ -168,7 +168,7 @@ cd lobbylink_perfv3 && SOLO="p3 p2 p4 p8" nohup ./campanas/pendientes_local.sh >
 Unas 2 h 10. Estado en `resultados/_logs/_pendientes_estado.txt`. Lo opcional (`SOLO="p9 p7 p5 p6"`, ~9 h 20) solo si sobra tiempo. Nota: p3 (equivalencia) ya está hecha en la t3.small; en el PC es una confirmación de 5 min.
 
 **Después de las pruebas del PC:**
-1. Leer cada corrida nueva y agregar sus números al informe: frecuencia por hilo (p2) en la explicación de BCrypt en Windows; F7 del contenedor con `-Xmx700m` (p4) donde el informe dice que el heap de 256 MB es un riesgo; f7d en PC y Docker (p8) junto a la de la t3.small, y quitar de la sección 6 la cautela de que F7d "por ahora solo en la t3.small".
+1. Leer cada corrida nueva y agregar sus números a los tres documentos de `informe/` (`informe.md`, `anexo_tecnico.md` capítulo 9.1 y `GUIA_INTERNA.md`, "Pruebas extra del 2026-11-09"; los tres ya tienen F9 y F7d de la t3.small): frecuencia por hilo (p2) en la explicación de BCrypt en Windows; F7 del contenedor con `-Xmx700m` (p4) donde el informe dice que el heap de 256 MB es un riesgo; f7d en PC y Docker (p8) junto a la de la t3.small, y quitar de la sección 6 la cautela de que F7d "por ahora solo en la t3.small".
 2. Regenerar el dashboard: `node dashboard/build.mjs`.
 3. Revisar el largo del informe (6-10 páginas) y preparar la sustentación de 7 min.
 4. `git push` cuando el usuario lo pida.

@@ -110,11 +110,19 @@ Si `us` es alto y `wa` es 0, la aplicación espera por CPU y no por disco.
 
 **Caché de WiredTiger.** La memoria donde MongoDB guarda los datos que usa. Si el dato está ahí, no toca el disco. Su tamaño es 50 % de (RAM − 1 GB), con un mínimo de 256 MB.
 
-**Fallo de caché (cache miss).** Pedir algo que no está en la caché y tener que ir al nivel más lento. Medimos 0 % de fallos en la caché de WiredTiger: los datos caben enteros (unos 10 MB).
+**Fallo de caché (cache miss).** Pedir algo que no está en la caché y tener que ir al nivel más lento. Medimos 0 % de fallos en la caché de WiredTiger: los datos caben enteros (unos 10 MB). En F9, con 1.000.000 de lobbies que no caben, subieron a 12-14 %.
 
 **RSS (memoria residente).** La RAM que un proceso está usando de verdad, no la que pidió. Es la métrica de memoria que pide el enunciado.
 
 **Heap y GC.** El heap es la memoria donde Java guarda los objetos. El GC (recolector de basura) la limpia y a veces hace pausas cortas.
+
+**Full GC y `OutOfMemoryError`.** Un Full GC es una recolección de todo el heap que detiene la app entera. Si después de limpiar sigue sin haber espacio, Java lanza `OutOfMemoryError` y el hilo que pedía memoria muere. Con 20.000 lobbies pasó las dos cosas (95 Full GC y 4 errores).
+
+**`-Xmx`.** La opción de Java que fija el tamaño máximo del heap. Sin ella, la JVM toma un cuarto de la memoria que ve: 256 MB en el contenedor de 1 GB y 478 MB en la t3.small.
+
+**OOM killer.** La parte del kernel de Linux que mata un proceso cuando la máquina se queda sin RAM. Mató a Java en la t3.small cuando le dimos `-Xmx1g` con 20.000 lobbies.
+
+**Paginación.** Devolver una lista por páginas (por ejemplo de 50 en 50) en lugar de toda de una vez. `GET /api/lobbies` no la tiene, y por eso con 20.000 lobbies no cabe en memoria.
 
 **IOPS.** Operaciones de entrada y salida por segundo contra el disco. Importa para lecturas o escrituras pequeñas y al azar.
 
@@ -336,7 +344,7 @@ Con el jar arreglado el techo predicho es 1.288,9 (PC), 262,3 (contenedor) y 336
 
 ### F7. ¿Qué pasa con 10 veces más?
 
-**Cómo.** Primero escribimos la predicción del tráfico ×10 en un archivo con fecha y hora (`_logs/prediccion_x10_*.md`), para que nadie diga que la acomodamos después (la del PC se escribió a las 08:49:31 y el generador arrancó a las 08:50:09, hora de Colombia; la carpeta dice 13:49 porque está en UTC). La predicción de los datos ×10 no quedó escrita antes: la extrapolamos después con F2 y pedía al menos 9,5 s de CPU por segundo, más de lo que tiene cualquier opción. Medimos dos casos durante 600 s: 10 veces el tráfico (de 10 a 100 req/s) y 10 veces los datos (2.000 lobbies a 10 req/s).
+**Cómo.** Primero escribimos la predicción del tráfico ×10 en un archivo con fecha y hora (`_logs/prediccion_x10_*.md`), para que nadie diga que la acomodamos después (la del PC se escribió a las 08:49:31 y el generador arrancó a las 08:50:09, hora de Colombia; la carpeta dice 13:49 porque está en UTC). La predicción de los datos ×10 no quedó escrita antes: la extrapolamos después con F2 y pedía al menos 9,5 s de CPU por segundo, más de lo que tiene cualquier opción. El 2026-11-09 lo repetimos bien en la t3.small (F7d, más abajo). Medimos dos casos durante 600 s: 10 veces el tráfico (de 10 a 100 req/s) y 10 veces los datos (2.000 lobbies a 10 req/s).
 
 **Qué salió.**
 - Jar base, las tres opciones: 100 req/s da 100 % de errores, y 2.000 lobbies da 99,2 % de errores.
@@ -373,6 +381,26 @@ Ojo: esos 23 req/s ya superaban la capacidad del jar base aun con créditos (en 
 
 **Por qué el mismo código rinde distinto en cada CPU.** El login (BCrypt, cálculo puro) cuesta 56,0 ms en el Ryzen y 83,1 ms en el Xeon, 1,48 veces más. Medido con el mismo microbenchmark: 4,63 GHz dentro del contenedor y 3,07 GHz en el Xeon, cociente 1,51, casi igual. L1 y L2 por núcleo son iguales en los dos (64 KB y 1 MB), así que la caché no explica la diferencia. En cambio el listado cuesta casi igual (169,8 ms en el contenedor contra 167,4 ms en la t3.small): son ~406 consultas que pasan por el kernel, y en Docker la red virtual lo encarece (`sy` 5,2 % ≈ `us` 5,0 %, contra `sy` 7,8 % y `us` 39,9 % en la t3.small). Además el PC le da a LobbyLink 4 núcleos físicos y la t3.small 1: el techo del PC es 3 veces el de la t3.small (71 contra 23,3 req/s), no 4, porque cada petición le cuesta un 31 % más por el efecto de Windows. Con el jar arreglado las dos CPU sobran para 80 req/s, así que la diferencia de hardware no cambia la recomendación.
 
+### Pruebas extra del 2026-11-09 (t3.small, jar arreglado)
+
+Corrieron en una t3.small Unlimited nueva con su generador aparte. Las dos instancias ya están terminadas. Datos en `resultados/ec2_t3small-pend/` y `resultados/ec2_t3small-xmx/`. Detalle en el capítulo 9.1 del anexo técnico.
+
+**F7d. ¿Acierta la predicción con más datos si la escribimos antes?** Cómo: `prediccion_datos.mjs` usó el barrido F2 para predecir la CPU a 10 req/s con 2.000 y 20.000 lobbies, y dejó el archivo con fecha antes de medir (`_logs/prediccion_datos_ec2_20261109_170101.md`). Después corrimos 600 s con cada tamaño.
+- 2.000 lobbies: predijo 9 % de CPU y midió 14 %. Pasa, con p95 59,8 ms y 0 errores.
+- 20.000 lobbies: predijo 37 % de CPU y falló el 100 % de las peticiones. No fue la CPU sino la memoria. Cada listado devuelve todos los lobbies (unos 3,4 MB de JSON con 20.000) y no cupo en el heap de 478 MB: 95 Full GC y 4 `OutOfMemoryError`, uno de los cuales mató el hilo de Tomcat que acepta conexiones, y por eso fallaron hasta las peticiones de ver un lobby.
+- Repetido con `-Xmx1g`: el kernel mató a Java a los 30 s, con 949 MB de Java y unos 580 MB de `mongod` en 1,9 GiB. Más heap no alcanza en esa máquina.
+
+**Qué significa.** El modelo solo mira CPU, así que no podía ver este fallo. La recomendación vale hasta pocos miles de lobbies. Antes de 20.000 hay que paginar el listado, y eso no lo medimos.
+
+**F9. ¿Cuándo empieza a importar el disco?** Cómo: sembramos lobbies directo en `mongod`, con ~3 KB de texto aleatorio cada uno, y pedimos lobbies al azar de 25 a 400 req/s. Una base de 20.000 (62 MB) cabe en la caché. Otra de 1.000.000 (3.117 MB) no cabe en 1,9 GiB de RAM.
+- Con la base que cabe, a 400 req/s: 0 % de fallos de caché, 1 IOPS, p95 28 ms.
+- Con la que no cabe, a 400 req/s: 12-14 % de fallos, 365 IOPS (el 12 % de lo que da el disco), `wa` 3,4 %, p95 121 ms y p99 1.089 ms. Todos los niveles pasan.
+- La CPU llega al 72 % en los dos casos.
+
+**Qué significa.** Aun sin caché, el disco llega a una octava parte de su capacidad cuando la CPU ya va por tres cuartos. El disco sube la cola de la latencia (cada lectura del EBS tarda unos 10 ms), pero no es lo que se llena primero. Esto vale para pedir un lobby a la vez. Un listado que recorra millones de lobbies que no caben sí dependería del disco.
+
+**Equivalencia del arreglo.** `telemetry/comparar_respuestas.mjs` arrancó los dos jars sobre la misma base y comparó 95 respuestas: listados, listados por videojuego y 45 detalles con 0 a 5 cupos libres. Las 95 fueron idénticas (`resultados/_equivalencia_20261109_ec2/`). Sirve para responder "¿cómo saben que el arreglo no cambió lo que responde la API?".
+
 **Límites.** No medimos los fallos de caché de la CPU ni la frecuencia del Ryzen. Los microbenchmarks no corrieron en la misma instancia de F1-F8. Las explicaciones de SMT y del login lento en Windows son hipótesis coherentes con los datos, no mediciones directas.
 
 ## Parte 4. Las cuatro preguntas de la sustentación
@@ -387,7 +415,13 @@ Todo nivel de carga sale de una medición. F1 dice cuánto cuesta una petición,
 La CPU, y dentro de ella `mongod`. Con el jar base a 10 req/s en la t3.small: `us` 39,9 % y `wa` 0 %, `mongod` al 62 % de un núcleo contra 34 % de la app, 20.412 documentos examinados por petición y 0 % de fallos de caché. El disco no participa (la máquina hace 1 IOPS en promedio contra 354 escrituras con `fsync` por segundo que puede dar). La causa es el N+1 sin índice.
 
 **Si la carga se multiplicara por diez, ¿qué se rompería primero?**
-La CPU de `mongod`. Lo predijimos por escrito y lo medimos en F7: el jar base falla en las tres máquinas, tanto con ×10 de tráfico como con ×10 de datos. Con el arreglo pasa todo.
+La CPU de `mongod`. Lo predijimos por escrito y lo medimos en F7: el jar base falla en las tres máquinas, tanto con ×10 de tráfico como con ×10 de datos. Con el arreglo pasa todo. Si preguntan por más datos todavía: con ×100 (20.000 lobbies) la t3.small arreglada se rompe por memoria, no por CPU, porque el listado sin paginar no cabe en el heap (F7d).
+
+**¿Hasta qué tamaño vale la recomendación?** (probable)
+"Hasta pocos miles de lobbies abiertos. Con 2.000 la t3.small usa 14 % de CPU y p95 de 60 ms. Con 20.000 falla el 100 % por memoria: 95 Full GC y `OutOfMemoryError` con el heap por defecto, y con `-Xmx1g` el kernel mata a Java. El siguiente arreglo es paginar `GET /api/lobbies`, que no medimos."
+
+**¿Y si los datos no caben en memoria? ¿No importa el disco?** (probable)
+"Lo probamos en F9 con 1.000.000 de lobbies, 3.117 MB en una máquina de 1,9 GiB. A 400 req/s los fallos de caché suben a 12-14 % y el disco hace 365 IOPS, el 12 % de lo que puede dar, con `wa` 3,4 %. La CPU ya está al 72 %. El disco empeora la cola de la latencia (p95 de 28 a 121 ms), pero no es lo que se llena primero."
 
 **¿Qué opción descartaron y por qué?**
 - La t3.small Standard: sin créditos queda a 0,4 vCPU (`steal` 78,8 % con `us` 16,8 % a 10 req/s) y no pasa de 2 req/s con el jar base. Con el arreglado, el gasto de créditos iguala a la ganancia entre 58 y 67 req/s, y por encima la instancia caería a la línea base. Unlimited cuesta lo mismo hasta 40 req/s sin ese riesgo.
@@ -404,5 +438,7 @@ Se elige la t3.small Unlimited con el arreglo, a 16,78 USD/mes de infraestructur
 - **F6 del jar arreglado** tiene 2 repeticiones en el PC y en Docker, no 3.
 - **Versiones de software.** El PC usa MongoDB 9.0.4 y Java 25. El contenedor y la t3.small usan MongoDB 7.0.45 y Java 21.
 - **Microbenchmarks.** Corrieron en otra t3.small del mismo tipo, no en la de F1-F8. La cota del 2,9 % usa latencia de memoria y documentos examinados medidos, no fallos de caché de CPU. No digan "medimos los fallos de caché de la CPU".
-- **Predicción de datos ×10.** No quedó escrita antes de medir. Solo la de tráfico ×10 tiene fecha y hora previas.
+- **Predicción de datos ×10.** En F7 no quedó escrita antes de medir. F7d sí la tiene escrita antes, pero solo en la t3.small. En el PC y el contenedor sigue pendiente (paso p8 de `campanas/pendientes_local.sh`).
+- **F9 y F7d corrieron en otra t3.small** del mismo tipo, no en la de F1-F8, y solo con el jar arreglado. F9 pide un lobby a la vez: no digan que probamos el listado con datos que no caben.
+- **El p50 de 1,7 ms con `-Xmx1g`** no es una latencia buena: son conexiones rechazadas porque Java ya estaba muerto.
 - **Lo que viene de fichas y no de mediciones.** El precio de EBS (0,08 USD/GB-mes) es un ejemplo de la página de AWS. El TDP del Ryzen (35 W) es el de la ficha de AMD. Ninguno de los dos se midió.
