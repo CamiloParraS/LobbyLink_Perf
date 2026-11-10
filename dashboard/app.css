@@ -108,3 +108,18 @@ code { font-size: 12px; }
 /* gráficos: no estirar el SVG de ancho fijo en tarjetas a todo lo ancho (el texto se agranda) */
 .card svg[role="img"] { max-width: 760px; display: block; }
 .grid2 .card svg[role="img"] { max-width: 100%; }
+
+/* ---- pestañas añadidas (extra.js) ---- */
+.cols3 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.story h3 { color: var(--ink2); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+.story ul { margin: 4px 0 0; padding-left: 18px; }
+.story li { margin: 3px 0; }
+.md { font-size: 13.5px; overflow-wrap: anywhere; }
+.md p { margin: 6px 0; }
+.md pre { background: var(--page); border: 1px solid var(--border); border-radius: 6px; padding: 8px; overflow: auto; font-size: 12.5px; }
+.md code { background: var(--page); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12.5px; }
+.md .mdh { margin: 14px 0 4px; }
+details > summary { cursor: pointer; padding: 4px 0; }
+details[open] > summary { font-weight: 600; }
+input.search { width: min(560px, 100%); padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); color: var(--ink); font: inherit; }
+.muted { color: var(--muted); font-size: 12.5px; }

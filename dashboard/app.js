@@ -104,7 +104,7 @@
   const envLegend = (keys) => keys.map((k) => { const [e, j] = k.split('|'); return { name: keyName(k), color: colorOf(e), dash: dashOf(j) }; });
 
   // ---------------------------------------------------------------- pestañas
-  const TABS = [
+  let TABS = [
     ['resumen', 'Resumen'], ['preguntas', 'Las 4 preguntas'], ['f0', 'F0 Sondas'], ['f1', 'F1 Costo por petición'], ['f2', 'F2 Datos'], ['f3', 'F3 Amdahl'], ['f4', 'F4 Cuotas'], ['f5', 'F5 Rampa'], ['f6', 'F6 Sostenida'],
     ['f78', 'F7 / F8 Largas'], ['recursos', 'Recursos por corrida'], ['creditos', 'Créditos (CloudWatch)'], ['entornos', 'Entornos (hardware)'], ['nmas1', 'N+1 antes / después'], ['costos', 'Costos'], ['datos', 'Datos y descargas'],
   ];
@@ -121,8 +121,8 @@
     const groups = keys.map((k) => { const [e, j] = k.split('|'); const kn = A.kneeOf(e, j, 'mezcla-lectura'); return { label: keyName(k), bars: [{ name: 'Predicho (F1)', value: A.xmaxOf(e, j, 'mezcla-lectura'), color: colorOf(e), outline: true }, { name: 'Codo medido (F5)', value: kn ? kn.knee : null, color: colorOf(e) }] }; });
     out.push(card('Codo medido contra techo predicho', 'Borde = predicción de F1 (X_max = capacidad / Σ pᵢ·Dᵢ); relleno = lo que la rampa midió. Si el relleno supera el borde en una barra “> n”, la rampa no llegó a romper la máquina.',
       barChart({ groups, ylabel: 'req/s (mezcla-lectura)', legend: [{ name: 'Predicho', color: 'var(--ink2)', bar: true, outline: true }, { name: 'Medido', color: 'var(--ink2)', bar: true }] })));
-    const NA = (e, j, p) => ({ f3: e === 'docker' || e === 'ec2s' ? 'El plan no corre Amdahl en Docker (lo cubre F4) ni en Standard' : null, f4: e !== 'docker' ? 'F4 (cuotas) solo existe en contenedor' : null, f2: e === 'ec2s' ? 'Standard: solo F0 F1 F5 F6 F8' : null, f0: j !== 'base' ? 'Las sondas son del hardware, no del jar' : null, f7: e === 'ec2s' || j === 'thr' ? 'F7 solo en la opción recomendada' : null, f8: e === 'pc' || e === 'docker' ? 'F8 (créditos) solo aplica a EC2 t3' : null }[p] || (j === 'thr' && p !== 'f6' ? 'Corrida solo de F6 con saldo 0' : null));
-    const cov = A.coverage().filter((r) => state.envs.has(r.env) && state.jars.has(r.jar)); const ph = ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8'];
+    const NA = (e, j, p) => ({ f3: e === 'docker' || e === 'ec2s' ? 'El plan no corre Amdahl en Docker (lo cubre F4) ni en Standard' : null, f4: e !== 'docker' ? 'F4 (cuotas) solo existe en contenedor' : null, f2: e === 'ec2s' ? 'Standard: solo F0 F1 F5 F6 F8' : null, f0: j !== 'base' ? 'Las sondas son del hardware, no del jar' : null, f7: e === 'ec2s' || j === 'thr' ? 'F7 solo en la opción recomendada' : null, f7d: e === 'ec2s' || j === 'thr' || (j === 'base' && e !== 'ec2u') ? 'F7d: jar arreglado en PC y contenedor; jar base en la t3.small Unlimited' : null, f9: e !== 'ec2u' ? 'F9 solo en la t3.small Unlimited (datos que no caben en RAM)' : null, f8: e === 'pc' || e === 'docker' ? 'F8 (créditos) solo aplica a EC2 t3' : null }[p] || (j === 'thr' && p !== 'f6' ? 'Corrida solo de F6 con saldo 0' : null));
+    const cov = A.coverage().filter((r) => state.envs.has(r.env) && state.jars.has(r.jar)); const ph = ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f7d', 'f8', 'f9'];
     out.push(card('Cobertura de la campaña', 'Número de corridas por fase. ◐ = incluye una corrida todavía en curso o incompleta. “— n/a” = el plan no la pide en ese entorno (pase el cursor para ver por qué). “○ falta” = pendiente de medir.',
       table(['Entorno', ...ph.map((p) => p.toUpperCase())], cov.map((r) => [keyName(key(r.env, r.jar)), ...ph.map((p) => { const c = r.cells[p]; if (c.n) return h('span', { class: c.partial ? 'warn' : 'ok' }, (c.partial ? '◐ ' : '✓ ') + c.n); const na = NA(r.env, r.jar, p); return na ? h('span', { class: 'warn', title: na }, '— n/a') : h('span', { class: 'no', title: 'Falta medir' }, '○ falta'); })]), { cls: 'cov' })));
     return out;
@@ -255,7 +255,7 @@
 
   function tabF78() {
     const out = []; const preds = D.predictions.filter((p) => /x10|f8/.test(p.file));
-    out.push(...explorer((r) => r.phase === 'f7' || r.phase === 'f8', 'Aún no hay corridas F7 / F8.', 'f78'));
+    out.push(...explorer((r) => ['f7', 'f7d', 'f8', 'f9', 'fm'].includes(r.phase), 'Aún no hay corridas F7 / F8.', 'f78'));
     if (preds.length) out.push(card('Predicciones escritas antes de medir', 'La marca de tiempo del archivo prueba que se escribieron antes de la corrida.', preds.map((p) => h('details', null, h('summary', null, p.file), h('pre', null, p.text)))));
     return out;
   }
@@ -390,6 +390,14 @@
   }
 
   const RENDER = { preguntas: tabPreguntas, resumen: tabResumen, f0: tabF0, f1: tabF1, f2: tabF2, f3: tabF3, f4: tabF4, f5: tabF5, f6: tabF6, f78: tabF78, entornos: tabEntornos, recursos: tabRecursos, creditos: tabCreditos, nmas1: tabN1, costos: tabCostos, datos: tabDatos };
+  // pestañas añadidas en extra.js (memoria y frecuencia, F7d/F9, historias de fallo, documentos)
+  if (window.EXTRA) {
+    const X = window.EXTRA({ D, A, L, ENV, state, h, fmt, fms, card, empty, table, pass, lineChart, barChart, keyName, colorOf, render: () => render() });
+    Object.assign(RENDER, X.RENDER); Object.assign(EXPL, X.EXPL);
+    const pos = { fallos: 'preguntas', memoria: 'f3', datos2: 'f78', docs: 'costos' }; const nt = TABS.slice();
+    for (const t of X.TABS) { const i = nt.findIndex((q) => q[0] === pos[t[0]]); nt.splice(i < 0 ? nt.length : i + 1, 0, t); }
+    TABS = nt;
+  }
 
   // ---------------------------------------------------------------- shell
   function chips() {

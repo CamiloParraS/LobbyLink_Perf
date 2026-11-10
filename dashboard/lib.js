@@ -50,7 +50,7 @@
     }
     function f1Row(env, jar, endpoint) { return D.models[key(env, jar)]?.f1?.f1?.find((r) => r.endpoint === endpoint) || null; }
     function coverage() {
-      const phases = ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8']; const out = [];
+      const phases = ['f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f7d', 'f8', 'f9']; const out = [];
       for (const k of keys().sort()) { const [env, jar] = k.split('|'); const row = { env, jar, cells: {} };
         for (const p of phases) { const rr = runs.filter((r) => r.env === env && r.jar === jar && r.phase === p); const n = rr.length + (p === 'f0' && D.sondas[k] ? 1 : 0); row.cells[p] = { n, partial: rr.some((r) => !r.ended) }; }
         out.push(row); }

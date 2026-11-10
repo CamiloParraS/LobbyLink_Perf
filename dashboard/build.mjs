@@ -29,12 +29,12 @@ const lines = (f) => readFileSync(f, 'utf8').split('\n').filter(Boolean);
 const J = (l) => { try { return JSON.parse(l); } catch { return null; } };
 
 // ---------------------------------------------------------------- entorno y jar a partir de nombres
-function classifyEc2(label) { return { env: label.includes('unl') ? 'ec2u' : 'ec2s', jar: label.includes('nplus1') ? 'fix' : label.includes('-thr') ? 'thr' : 'base', label }; }
+function classifyEc2(label) { return { env: (label.includes('unl') || label.includes('pend') || label.includes('xmx')) ? 'ec2u' : 'ec2s', jar: label.includes('nplus1') ? 'fix' : label.includes('-thr') ? 'thr' : 'base', label }; }
 function classifyLocal(dirName) {
   // 20261106_093157_windows_v3-f6-mezcla-lectura-r1  |  ..._docker_v3fix-a1m1-f1-list
   const m = dirName.match(/^\d{8}_\d{6}_(windows|docker)_(.+)$/); if (!m) return null;
   const tokens = m[2].split('-'); const tag = tokens[0];
-  const pi = tokens.findIndex((t) => /^f\d$/.test(t)); if (pi < 0) return null;
+  const pi = tokens.findIndex((t) => /^f\d+d?$/.test(t)); if (pi < 0) return null;
   const quota = (tokens.find((t) => /^a[\d.]+m[\d.]+$/.test(t))) || null;   // en F4 la cuota va después de la fase (v3-f4-a1m2); en las demás, antes (v3-a1m1-f1-list)
   return { env: m[1] === 'windows' ? 'pc' : 'docker', jar: /^v3fix/.test(tag) ? 'fix' : 'base', net: /net$/.test(tag), tag, quota, phaseIdx: pi, tokens };
 }
@@ -85,7 +85,7 @@ function summarizeRun(dir, info) {
   // serie temporal (cubos de 10 s) solo para fases de carga sostenida/rampa
   let series = null;
   const phase = info.phase;
-  if (['f5', 'f6', 'f7', 'f8'].includes(phase) && secs.length) {
+  if (['f5', 'f6', 'f7', 'f7d', 'f8', 'f9', 'fm'].includes(phase) && secs.length) {
     const B = 10000; const t0 = secs[0].at; const buckets = new Map();
     const get = (i) => { if (!buckets.has(i)) buckets.set(i, { n: 0, errs: 0, p95w: 0, p95n: 0, rate: null, inflight: 0, k: 0, busy: [], steal: [], app: [], mongo: [], appRss: [], mongoRss: [], step: null, measuring: false }); return buckets.get(i); };
     for (const s of secs) { const b = get(Math.floor((s.at - t0) / B)); b.n += s.n || 0; b.errs += s.errs || 0; if (s.lat?.n) { b.p95w += s.lat.p95 * s.lat.n; b.p95n += s.lat.n; } b.rate = s.rate ?? b.rate; b.inflight = Math.max(b.inflight, s.inflight || 0); b.step = s.step; b.measuring = b.measuring || !!s.measuring; b.k++; }
@@ -185,8 +185,8 @@ for (const name of readdirSync(RES)) {
         continue;
       }
       if (sub === 'cloudwatch') continue;
-      const ph = sub.match(/^(f\d)/); if (!ph) continue;
-      addRun({ id: name + '/' + sub, env: c.env, jar: c.jar, label: lab, run: sub, phase: ph[1], quota: null, startedFolder: null }, d);
+      const ph = sub.match(/^(f\d+d?)/); if (!ph) continue;
+      addRun({ id: name + '/' + sub, env: c.env, jar: c.jar, label: lab, run: lab.includes('xmx') ? sub + '-xmx1g' : sub, phase: ph[1], quota: null, startedFolder: null }, d);
     }
     continue;
   }
@@ -197,7 +197,7 @@ for (const name of readdirSync(RES)) {
     continue;
   }
   const runName = c.tokens.slice(c.phaseIdx).join('-');
-  addRun({ id: name, env: c.env, jar: c.jar, label: c.tag + (c.quota ? '-' + c.quota : ''), run: runName, phase: c.net ? 'fx' : c.tokens[c.phaseIdx], quota: c.quota, startedFolder: name.slice(0, 15) }, full);
+  addRun({ id: name, env: c.env, jar: c.jar, label: c.tag + (c.quota ? '-' + c.quota : ''), run: runName, phase: c.net ? 'fx' : c.tag === 'v3frec' ? 'fq' : c.tag === 'v3xmx' ? 'fm' : c.tokens[c.phaseIdx], quota: c.quota, startedFolder: name.slice(0, 15) }, full);
 }
 // informes md locales
 const LOGS = join(RES, '_logs');
@@ -218,8 +218,57 @@ for (const [k, dirn] of [['ec2u', 'ec2_t3small-unl'], ['ec2s', 'ec2_t3small-std'
   for (const f of readdirSync(d)) { if (!f.endsWith('.json')) continue; const arr = JSON.parse(readFileSync(join(d, f), 'utf8')); cloudwatch[k][f.replace('.json', '')] = arr.map((x) => ({ t: Date.parse(x.Timestamp), avg: r2(x.Average), max: r2(x.Maximum) })); }
 }
 
+// ---------------------------------------------------------------- extras: microbenchmarks, frecuencia por hilo, documentos
+const readT = (f) => { try { return readFileSync(f, 'utf8').replace(/\x1b\[[0-9;?]*[A-Za-z]/g, ''); } catch { return null; } };
+function parseMembench(text) {
+  // bloques separados por líneas '--- título'; cada uno con series FREQ_GHZ_serie y/o tabla TAM_KB
+  if (!text) return [];
+  const body = text.includes('=====BENCH_BEGIN') ? text.slice(text.indexOf('=====BENCH_BEGIN'), text.indexOf('=====BENCH_END')) : text;
+  const blocks = []; let cur = null;
+  for (const raw of body.split('\n')) {
+    const line = raw.replace(/\r/g, '');
+    if (/^---\s/.test(line)) { cur = { title: line.replace(/^---\s*/, '').trim(), freq: [], curve: [], rawFreq: [] }; blocks.push(cur); continue; }
+    if (!cur) continue;
+    const fm = line.match(/FREQ_GHZ_serie:\s*(.*)$/); if (fm) { const nums = (fm[1].match(/\d+\.\d+/g) || []).map(Number); if (nums.length) cur.rawFreq.push(nums); }
+    const cm = line.match(/^(\d+)\s+(\d+\.\d+)\s*$/); if (cm) cur.curve.push([Number(cm[1]), Number(cm[2])]);
+  }
+  for (const b of blocks) { const all = b.rawFreq.flat(); b.freq = all.length ? { mean: r2(all.reduce((a, c) => a + c, 0) / all.length), min: r2(Math.min(...all)), max: r2(Math.max(...all)), n: all.length } : null; delete b.rawFreq; }
+  return blocks.filter((b) => b.freq || b.curve.length);
+}
+const membench = {
+  pc: parseMembench(readT(join(RES, '_microbench_ryzen_20261108', 'salida.txt'))),
+  docker: parseMembench(readT(join(RES, '_microbench_docker_20261108', 'salida.txt'))),
+  ec2: parseMembench(readT(join(RES, '_microbench_20261108', 'consola_membench_i-0ae9dc8ec7e042858.txt'))),
+  pcPorHilo: [],
+};
+{ const t = readT(join(RES, '_microbench_ryzen_20261108', 'salida_por_hilo.txt')); if (t) for (const l of t.split('\n')) { const m = l.replace(/\r/g, '').match(/hilo (\d+):\s*FREQ_GHZ_serie:\s*(.*)$/); if (m) { const v = (m[2].match(/\d+\.\d+/g) || []).map(Number); membench.pcPorHilo.push({ hilo: Number(m[1]), ghz: v }); } } }
+
+// frecuencia por hilo medida durante F1 (win-sampler)
+const frecuencia = [];
+{ const t = readT(join(LOGS, 'frecuencia_windows_f1_20261109.md')); if (t) {
+  let run = null, lvl = null;
+  for (const l of t.split('\n')) {
+    const h2 = l.match(/^## (\S+)/); if (h2) { run = { run: h2[1], levels: [] }; frecuencia.push(run); continue; }
+    const lv = l.match(/^Nivel (\d+) \((\d+) workers\): (\d+) muestras, frecuencia base informada (\d+) MHz/); if (lv && run) { lvl = { nivel: Number(lv[1]), workers: Number(lv[2]), muestras: Number(lv[3]), baseMHz: Number(lv[4]), hilos: [], ponderadaServidor: null }; run.levels.push(lvl); continue; }
+    const row = l.match(/^\| (\d+) \| (sí|no) \| ([\d.,]+) \| ([\d.,]+) \| ([\d.,]+) \|/); if (row && lvl) { lvl.hilos.push({ hilo: Number(row[1]), servidor: row[2] === 'sí', busy: num(row[3]), mhz: num(row[4]), mhzW: num(row[5]) }); continue; }
+    const sv = l.match(/frecuencia ponderada por ocupación ([\d.]+) MHz/); if (sv && lvl) lvl.ponderadaServidor = num(sv[1]);
+  }
+} }
+
+// documentos crudos (md y txt cortos) para la pestaña “Documentos”
+const docs = [];
+const addDoc = (grupo, file, title) => { const t = readT(file); if (t == null) return; docs.push({ grupo, title: title || relative(RES, file).split(sep).join('/'), path: 'resultados/' + relative(RES, file).split(sep).join('/'), text: t.slice(0, 80000) }); };
+for (const f of readdirSync(LOGS).sort()) if (f.endsWith('.md')) addDoc(/^prediccion/.test(f) ? 'Predicciones escritas antes de medir' : /^(modelo|datos|amdahl|validacion)/.test(f) ? 'Modelos y validaciones (PC y contenedor)' : 'Otros informes de corrida', join(LOGS, f));
+for (const n of readdirSync(RES).sort()) { const d = join(RES, n); if (!statSync(d).isDirectory()) continue;
+  if (n.startsWith('ec2_')) { const ld = join(d, '_logs'); if (existsSync(ld)) for (const f of readdirSync(ld).sort()) if (f.endsWith('.md')) addDoc(/^prediccion/.test(f) ? 'Predicciones escritas antes de medir' : 'EC2 · modelos y validaciones', join(ld, f)); }
+  else if (/^_equivalencia/.test(n)) addDoc('Equivalencia del arreglo N+1', join(d, 'resultado.md'));
+  else if (/^_microbench/.test(n)) { addDoc('Microbenchmarks de memoria y frecuencia', join(d, 'README.md')); }
+  else if (/^_aws_/.test(n)) for (const f of readdirSync(d)) if (f.endsWith('.md')) addDoc('Costos y precios de AWS', join(d, f));
+}
+for (const n of readdirSync(RES)) if (n.startsWith('ec2_')) { const d = join(RES, n); for (const f of readdirSync(d)) if (f.endsWith('.md')) addDoc('EC2 · informes de corrida', join(d, f)); for (const sub of readdirSync(d)) { const sd = join(d, sub); if (statSync(sd).isDirectory() && sub !== '_logs') for (const f of readdirSync(sd)) if (/^(reporte|resumen).*\.md$/.test(f)) addDoc('EC2 · informes de corrida', join(sd, f)); } }
 runs.sort((a, b) => (a.startedAtMs ?? 0) - (b.startedAtMs ?? 0));
-const data = { generatedAt: new Date().toISOString(), runs, models, sondas, machines, predictions, cloudwatch };
+const data = { generatedAt: new Date().toISOString(), runs, models, sondas, machines, predictions, cloudwatch, membench, frecuencia };
+writeFileSync(join(here, 'docs.js'), 'window.DOCS = ' + JSON.stringify(docs) + ';\n');
 writeFileSync(join(here, 'data.js'), 'window.DATA = ' + JSON.stringify(data) + ';\n');
 writeFileSync(CACHE_FILE, JSON.stringify(newCache));
 writeFileSync(MANIFEST, JSON.stringify(newManifest));

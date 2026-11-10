@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LobbyLink v3 · Conceptos</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  body.conceptos main { display: block; max-width: 880px; padding-bottom: 80px; }
+  body.conceptos h2.c { font-size: 18px; margin: 34px 0 6px; padding-top: 14px; border-top: 1px solid var(--axis); scroll-margin-top: 56px; }
+  body.conceptos p, body.conceptos li { max-width: 74ch; }
+  body.conceptos .toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+  body.conceptos .toc a { border: 1px solid var(--border); border-radius: 999px; padding: 3px 11px; color: var(--ink); text-decoration: none; background: var(--surface); font-size: 14px; }
+  body.conceptos .toc a:hover { border-color: var(--accent); }
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 10px 0; }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.bad { border-left-color: var(--bad); }
+  .path { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin: 12px 0; }
+  .path > div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 14px; }
+  .path > div b { display: block; }
+  .path > i { align-self: center; color: var(--muted); font-style: normal; }
+  .v { font-weight: 650; font-variant-numeric: tabular-nums; }
+  code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 13px; }
+</style>
+</head>
+<body class="conceptos">
+<header>
+  <h1>Cómo entender lo que mide LobbyLink v3</h1>
+  <p class="sub">Cada concepto lleva la cifra medida por nosotros (se lee de <code>data.js</code>, que sale de <code>resultados/</code>) y el componente de hardware que la explica.</p>
+  <div class="bar">
+    <a class="chip" href="index.html">← Comparación entre entornos</a>
+    <a class="chip" href="visor.html">Visor de una corrida →</a>
+    <button class="chip theme" id="theme" type="button">Tema</button>
+  </div>
+  <div class="toc" id="toc"></div>
+</header>
+<main id="main">
+
+<h2 class="c" id="viaje">El viaje de una petición</h2>
+<p>Una petición a <code>GET /api/lobbies</code> cruza estos componentes. Cada uno tiene su propia métrica y su propio límite.</p>
+<div class="path">
+  <div><b>Generador</b>tasa fija (Poisson) o bucle cerrado</div><i>→</i>
+  <div><b>Red</b>RTT base <span class="v" data-v="rtt"></span></div><i>→</i>
+  <div><b>Tomcat</b>hilos, cola de conexiones</div><i>→</i>
+  <div><b>Spring + JWT</b>verifica el token (BCrypt solo en login)</div><i>→</i>
+  <div><b>Servicio</b>un <code>findById</code> por lobby (N+1)</div><i>→</i>
+  <div><b>mongod</b>caché de WiredTiger</div><i>→</i>
+  <div><b>Disco</b>IOPS y MB/s</div>
+</div>
+<p>En el listado base, mongod gasta <span class="v" data-v="mongoPctPc"></span> de los ms de CPU del PC. La app no espera al disco: espera a mongod, que a su vez trabaja casi siempre en memoria (la base de 200 lobbies cabe en la caché). Por eso <code>wa</code> sale cercano a 0 aunque la máquina esté saturada.</p>
+
+<h2 class="c" id="percentiles">p50, p95 y p99</h2>
+<p>p50 es la mitad de las peticiones; p95 y p99 son las lentas. El requisito del plan es <b>p95 ≤ 1.000 ms y errores ≤ 1 %</b> (<code>umbrales.json</code>); las tablas también muestran 300 y 500 ms para comprobar que la conclusión no depende del umbral elegido.</p>
+<div class="callout"><b>Ejemplo medido.</b> Listar en 1 worker: p50 <span class="v" data-v="listP50pc"></span> ms en el PC. Un p99 mucho mayor que el p50 significa pausas (GC de la JVM, colas, frenado por cuota) y no un servicio uniformemente lento. Para saber cuál, mira el visor: pausas de GC, frenado CFS y steal en la misma línea de tiempo.</div>
+<p>Un p95 de <b>10.181 ms</b> en las tablas de F7 no es una latencia: es el timeout del generador, contado como latencia. Significa que la petición no terminó.</p>
+
+<h2 class="c" id="carga">Tasa fija y bucle cerrado</h2>
+<ul>
+  <li><b>Bucle cerrado (v1/v2):</b> N workers piden y esperan. Si el servidor se retrasa, el generador pide menos; la latencia con muchos workers mide la cola, no el servicio.</li>
+  <li><b>Tasa fija (v3, F5 en adelante):</b> las peticiones llegan según un proceso de Poisson con semilla, a λ req/s, aunque el servidor vaya lento. La latencia se mide desde la hora programada de cada petición (incluye la espera aunque el generador no pudiera enviarla) y los timeouts cuentan como error.</li>
+  <li><b>Ley de Little:</b> peticiones en vuelo = λ × tiempo de respuesta. Si lograda/ofrecida baja de 1, la máquina se saturó; si el retraso p99 del generador pasa de 50 ms, ese nivel no vale.</li>
+</ul>
+<p>Los niveles de F5 salen de F1: se predice un techo X<sub>max</sub> = capacidad / Σ pᵢ·Dᵢ (cota superior, supone que el costo por petición no cambia con la carga) y la rampa mide cuánto queda por debajo. Ejemplo del PC (jar base, mezcla-lectura): predicho <span class="v" data-v="xmaxPc"></span> req/s, codo medido <span class="v" data-v="kneePc"></span> req/s.</p>
+
+<h2 class="c" id="cpu">CPU: us, sy, wa, id y st</h2>
+<ul>
+  <li><b>us</b> trabajo de la aplicación (Java, BCrypt, mongod). <b>sy</b> trabajo del kernel (red, cambios de contexto). <b>wa</b> espera a disco. <b>st</b> (steal) CPU que el hipervisor no entregó. <b>id</b> libre.</li>
+  <li>Con <code>us</code> alto y <code>wa</code> ≈ 0 el cuello es la CPU, no el disco. En AWS, <code>steal</code> distinto de 0 indica que otra máquina o el límite de créditos te quita ciclos.</li>
+  <li>Windows no entrega <code>iowait</code> ni <code>steal</code>; el PC reporta CPU total, por proceso y por hilo.</li>
+</ul>
+<div class="callout">La CPU de la máquina en F6 al nivel más alto: PC <span class="v" data-v="busyPc"></span> %, Docker <span class="v" data-v="busyDocker"></span> %, t3.small Unlimited <span class="v" data-v="busyEc2u"></span> %.</div>
+
+<h2 class="c" id="amdahl">Parte secuencial (Amdahl) y SMT</h2>
+<p>Si una fracción <i>p</i> del trabajo se paraleliza, el techo de aceleración es 1/(1−p), no el número de núcleos. En F3 se midió <i>p</i> cambiando el número de workers (perfil <code>solo-list</code>): PC <span class="v" data-v="amdahlPc"></span>; t3.small Unlimited <span class="v" data-v="amdahlEc2u"></span>. Un hilo lógico extra del mismo núcleo (SMT) no es otro núcleo: comparte la caché y las unidades de ejecución.</p>
+
+<h2 class="c" id="bcrypt">BCrypt: trabajo de CPU puro</h2>
+<p>El login y el registro hashean con BCrypt (factor de costo fijo): sin acceso a memoria grande ni a disco, solo ALU. En F1, la app gasta <span class="v" data-v="loginPc"></span> ms de CPU por login en el PC frente a <span class="v" data-v="viewPc"></span> ms por ver un lobby. Por eso el costo de BCrypt depende de la <b>frecuencia por hilo</b>: durante F1-login el PC trabajó a 2.126 MHz ponderados en los hilos de la app y a 2.768 MHz en F1-list (<code>_logs/frecuencia_windows_f1_20261109.md</code>).</p>
+
+<h2 class="c" id="cache">Jerarquía de memoria: por qué importa cuánto cabe</h2>
+<p>El tiempo de un acceso depende del nivel donde está el dato. Medido con <code>membench.c</code> en cada máquina:</p>
+<div id="memtable"></div>
+<p>Un listado que recorre muchos documentos pasa de L1/L2 a L3 y a RAM conforme crece el conjunto de trabajo. La base de 200 lobbies cabe en la caché de WiredTiger (<span class="v" data-v="cacheMB"></span> MB en la t3.small); el millón de lobbies de F9 (3.117 MB) no cabe en 1,9 GiB, y eso se ve en los fallos de caché de mongod. Pestaña: <a href="index.html#sec-memoria">Memoria y frecuencia</a>.</p>
+
+<h2 class="c" id="colas">Colas: por qué todo se rompe de golpe</h2>
+<p>Cerca del 100 % de utilización, un pequeño aumento de λ provoca una espera desproporcionada. Por eso se reporta el codo de F5 y la regla del plan sostiene como máximo el <b>60 % del codo</b>. Ejemplo medido: en el PC con 100 req/s (×10 el tráfico base) el jar base falla; con el arreglo N+1 pasa con 0 errores (<code>HANDOFF.md §8</code>).</p>
+
+<h2 class="c" id="cuota">Cuota del contenedor: frenado con la máquina libre</h2>
+<p>Docker limita la CPU con cuotas CFS: 1 CPU = 100 ms de cada 100 ms. Al agotarla, el kernel detiene el hilo (columna “Frenado ms/s” en F4) aunque el PC tenga núcleos libres. Docker Desktop además corre en una VM WSL2 (12 CPU, 7,5 GB), lo que no existe en un Linux nativo. Pestaña: <a href="index.html#sec-f4">F4 Cuotas</a>.</p>
+
+<h2 class="c" id="memoria">Memoria: RSS, heap y GC</h2>
+<ul>
+  <li><b>RSS</b> es la memoria residente del proceso; el <b>heap</b> es lo que la JVM reserva para objetos y el <b>GC</b> lo limpia en pausas.</li>
+  <li><code>GET /api/lobbies</code> no tiene paginación: construye en memoria toda la lista. Con 20.000 lobbies, la t3.small y el contenedor devolvieron 100 % de errores por falta de heap y de RAM, aunque la predicción de CPU decía que cabían. El PC pasó con 1.938 MB de RSS.</li>
+  <li>Las pausas Full GC y los <code>OutOfMemoryError</code> se ven en el visor (heap y pausas de GC) y en <code>app.log</code> de cada corrida.</li>
+</ul>
+<p>Pestañas: <a href="index.html#sec-datos2">F7d / F9 Datos</a> e <a href="index.html#sec-fallos">Historias de fallo</a>.</p>
+
+<h2 class="c" id="disco">Disco: IOPS, caudal y %util</h2>
+<p>Los techos del disco salen de fio en F0: lectura aleatoria PC <span class="v" data-v="iopsPc"></span> IOPS, t3.small <span class="v" data-v="iopsEc2u"></span> IOPS. Una carga que usa una fracción pequeña del techo con la CPU llena tiene un cuello de CPU. En F9 (datos que no caben) el disco llegó a 365 IOPS, el 12 % de su capacidad.</p>
+
+<h2 class="c" id="red">Red</h2>
+<p>La carga de LobbyLink es mayormente JSON de respuesta: el listado de 200 lobbies pesa decenas de KB y es lo que domina la salida (F1: columna “KB resp.”). En EC2 el generador corre en otra instancia, así que la red real (RTT base <span class="v" data-v="rtt"></span> en la t3.small) entra en la latencia; en el PC y en Docker es la interfaz local.</p>
+
+<h2 class="c" id="graficas">Qué dice cada pestaña</h2>
+<table>
+  <thead><tr><th>Pestaña</th><th>Pregunta que responde</th></tr></thead>
+  <tbody>
+    <tr><td><a href="index.html#sec-resumen">Resumen</a>, <a href="index.html#sec-preguntas">Las 4 preguntas</a></td><td>Qué máquina sirve para qué carga y por qué.</td></tr>
+    <tr><td><a href="index.html#sec-fallos">Historias de fallo</a></td><td>Qué se rompió, con qué número y qué componente lo explica.</td></tr>
+    <tr><td><a href="index.html#sec-f0">F0</a>, <a href="index.html#sec-f1">F1</a></td><td>Techos del hardware y costo en ms de CPU de cada endpoint.</td></tr>
+    <tr><td><a href="index.html#sec-f2">F2</a>, <a href="index.html#sec-f3">F3</a>, <a href="index.html#sec-memoria">Memoria</a></td><td>Cómo crece el costo con los datos, la parte secuencial y la jerarquía de caché.</td></tr>
+    <tr><td><a href="index.html#sec-f4">F4</a></td><td>Qué limita en el contenedor, la app o mongod.</td></tr>
+    <tr><td><a href="index.html#sec-f5">F5</a>, <a href="index.html#sec-f6">F6</a></td><td>Dónde se rompe de verdad y qué pasa sostenido varios minutos.</td></tr>
+    <tr><td><a href="index.html#sec-f78">F7 / F8</a>, <a href="index.html#sec-datos2">F7d / F9</a></td><td>Qué se rompe con ×10 tráfico, ×10 datos, con el tiempo y con datos que no caben.</td></tr>
+    <tr><td><a href="index.html#sec-creditos">Créditos</a>, <a href="index.html#sec-costos">Costos</a></td><td>Créditos de CPU de la t3 y USD por 1.000 peticiones.</td></tr>
+    <tr><td><a href="visor.html">Visor</a></td><td>Cualquier corrida con todas sus series en una línea de tiempo.</td></tr>
+    <tr><td><a href="index.html#sec-docs">Documentos</a></td><td>Predicciones, modelos, equivalencia, microbenchmarks y precios en texto.</td></tr>
+  </tbody>
+</table>
+
+<h2 class="c" id="sustentacion">Para la sustentación (7 + 3 min)</h2>
+<ol>
+  <li><b>Qué se midió y por qué así.</b> Costo por endpoint (F1) → techo predicho → rampa y carga sostenida a tasa fija (F5/F6). Mostrar <a href="index.html#sec-resumen">Resumen</a>.</li>
+  <li><b>Qué máquina gana y bajo qué regla.</b> ≤ 60 % del codo, p95 ≤ 1.000 ms, errores ≤ 1 %, USD por 1.000 peticiones. <a href="index.html#sec-preguntas">Las 4 preguntas</a> y <a href="index.html#sec-costos">Costos</a>.</li>
+  <li><b>Un hallazgo con su componente.</b> N+1: mongod gasta más CPU que la app; el arreglo lo comprueba. <a href="index.html#sec-fallos">Historia 1</a> y N+1 antes/después.</li>
+  <li><b>Un fallo que la predicción no vio.</b> 20.000 lobbies: falla la memoria, no la CPU. <a href="index.html#sec-datos2">F7d / F9</a>.</li>
+  <li><b>Una explicación de hardware.</b> Caché y frecuencia: <a href="index.html#sec-memoria">Memoria y frecuencia</a>.</li>
+  <li><b>Limitaciones honestas.</b> Un solo PC y una sola instancia por tipo, 2–3 repeticiones, reposo del PC de 11,6 % y 12,3 % en F7d (límite 5 %), Docker sobre WSL2.</li>
+</ol>
+</main>
+<div class="tip" id="tip"></div>
+<script src="data.js"></script>
+<script src="ui.js"></script>
+<script src="lib.js"></script>
+<script>
+(function () {
+  const D = window.DATA, L = window.LIB, A = L.make(D), U = window.UI, fmt = U.fmt;
+  const ids = [...document.querySelectorAll('h2.c')];
+  document.getElementById('toc').append(...ids.map((e) => { const a = document.createElement('a'); a.href = '#' + e.id; a.textContent = e.textContent; return a; }));
+  const last = (env, jar) => { const lv = A.f6Levels(env, jar); return lv.length ? lv[lv.length - 1] : null; };
+  const f1 = (e, ep) => A.f1Row(e, 'base', ep);
+  const k = (e) => A.kneeOf(e, 'base', 'mezcla-lectura');
+  const am = (e) => { const a = D.models[e + '|base'] && D.models[e + '|base'].amdahl && D.models[e + '|base'].amdahl.find((x) => x.profile === 'solo-list'); return a && a.p != null ? `p = ${fmt(a.p, 2)} (techo ${fmt(1 / (1 - a.p), 1)}×)` : '–'; };
+  const runOf = (env) => D.runs.find((r) => r.env === env && r.phase === 'f1');
+  const V = {
+    rtt: () => { const r = D.runs.find((x) => x.env === 'ec2u' && x.seed && x.seed.baseRttMs != null); return r ? fmt(r.seed.baseRttMs) + ' ms' : '–'; },
+    mongoPctPc: () => { const l = f1('pc', 'list'); return l ? `${fmt(l.mongoPct, 0)} % (${fmt(l.mongo)} de ${fmt(l.total)} ms)` : '–'; },
+    listP50pc: () => { const l = f1('pc', 'list'); return l ? fmt(l.p50) : '–'; },
+    xmaxPc: () => fmt(A.xmaxOf('pc', 'base', 'mezcla-lectura')),
+    kneePc: () => { const q = k('pc'); return q ? (q.allPass ? '> ' : '') + fmt(q.knee) : '–'; },
+    busyPc: () => { const l = last('pc', 'base'); return l && l.res ? fmt(l.res.busy) : '–'; },
+    busyDocker: () => { const l = last('docker', 'base'); return l && l.res ? fmt(l.res.busy) : '–'; },
+    busyEc2u: () => { const l = last('ec2u', 'base'); return l && l.res ? fmt(l.res.busy) : '–'; },
+    amdahlPc: () => am('pc'), amdahlEc2u: () => am('ec2u'),
+    loginPc: () => { const l = f1('pc', 'login'); return l ? fmt(l.app) : '–'; },
+    viewPc: () => { const l = f1('pc', 'view'); return l ? fmt(l.total, 2) : '–'; },
+    cacheMB: () => { const m = D.machines.ec2u_mongo || D.machines.ec2s_mongo; return m ? fmt(m.cacheMaxMB, 0) : '440'; },
+    iopsPc: () => { const s = D.sondas['pc|base']; return s && s.randread ? fmt(s.randread.iops, 0) : '–'; },
+    iopsEc2u: () => { const s = D.sondas['ec2u|base']; return s && s.randread ? fmt(s.randread.iops, 0) : '–'; },
+  };
+  document.querySelectorAll('[data-v]').forEach((e) => { try { e.textContent = V[e.dataset.v](); } catch (x) { e.textContent = '–'; } });
+  // tabla de latencia de acceso por tamaño
+  const MB = D.membench || {}; const at = (b, kb) => { const p = b && b.curve.find((q) => q[0] === kb); return p ? p[1] : null; };
+  const srcs = [['PC (Ryzen 7 7445HS)', (MB.pc || []).find((b) => b.curve.length)], ['Docker (cuota 1 CPU)', (MB.docker || []).find((b) => b.curve.length)], ['t3.small (Xeon 8259CL)', (MB.ec2 || []).find((b) => b.curve.length)]].filter((s) => s[1]);
+  const sizes = [[16, '16 KB (L1)'], [256, '256 KB (L2)'], [4096, '4 MB (L3)'], [65536, '64 MB (RAM)'], [262144, '256 MB (RAM)']];
+  document.getElementById('memtable').append(U.table(['Máquina', ...sizes.map((s) => s[1] + ' · ns')], srcs.map(([n, b]) => [n, ...sizes.map(([z]) => fmt(at(b, z), 2))]), { num: [1, 2, 3, 4, 5] }));
+  document.getElementById('theme').addEventListener('click', () => { const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; });
+})();
+</script>
+</body>
+</html>

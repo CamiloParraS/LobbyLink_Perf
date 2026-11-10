@@ -6,7 +6,7 @@
   const { h, sv, fmt, fms, empty, card, showTip, hideTip, tipRow, niceTicks, logTicks, legendEl, table, pass } = window.UI;
   const ENV = Object.fromEntries(ENVS.map((e) => [e.id, e]));
   const JARN = { base: 'jar base', fix: 'N+1 arreglado', thr: 'saldo 0' };
-  const PHASE = { f0: 'F0 sondas', f1: 'F1 costo', f2: 'F2 datos', f3: 'F3 Amdahl', f4: 'F4 cuotas', f5: 'F5 rampa', f6: 'F6 sostenida', f7: 'F7 ×10', f8: 'F8 largo', fx: 'FX red' };
+  const PHASE = { f0: 'F0 sondas', f1: 'F1 costo', f2: 'F2 datos', f3: 'F3 Amdahl', f4: 'F4 cuotas', f5: 'F5 rampa', f6: 'F6 sostenida', f7: 'F7 ×10', f7d: 'F7d datos', f8: 'F8 largo', f9: 'F9 sin caché', fq: 'FQ frecuencia', fm: 'FM -Xmx', fx: 'FX red' };
   const THRESH_P95 = LB.THRESH_P95, THRESH_ERR = LB.THRESH_ERR;
   const RUNS = D.runs.slice().sort((a, b) => ENV[a.env].slot - ENV[b.env].slot || (a.jar > b.jar ? 1 : a.jar < b.jar ? -1 : 0) || a.phase.localeCompare(b.phase) || (a.startedAtMs ?? 0) - (b.startedAtMs ?? 0));
   const byId = new Map(RUNS.map((r) => [r.id, r]));

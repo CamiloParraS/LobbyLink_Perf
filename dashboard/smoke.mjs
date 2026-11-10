@@ -1,13 +1,13 @@
 // Prueba de humo sin navegador: DOM falso, recorre todas las pestanas y avisa de excepciones.
-import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+import { createRequire } from 'node:module'; import { readFileSync } from 'node:fs'; const require = createRequire(import.meta.url);
 class El { constructor(t) { this.tag = t; this.kids = []; this.attrs = {}; this.style = {}; this.dataset = {}; this.className = ''; this.textContent = ''; }
   setAttribute(k, v) { this.attrs[k] = v; } addEventListener() {} append(...k) { this.kids.push(...k); } replaceChildren(...k) { this.kids = k; } click() {}
   get nodeType() { return 1; } getBoundingClientRect() { return { left: 0, width: 500 }; } set innerHTML(v) { this.html = v; } }
 const els = {}; globalThis.document = { createElement: (t) => new El(t), createElementNS: (n, t) => new El(t), createTextNode: (t) => ({ nodeType: 3, t }), getElementById: (id) => (els[id] ??= new El(id)), documentElement: new El('html') };
 globalThis.window = globalThis; globalThis.localStorage = { getItem: () => null, setItem() {} }; globalThis.matchMedia = () => ({ matches: false }); globalThis.addEventListener = () => {}; globalThis.innerWidth = 1200; globalThis.innerHeight = 800; globalThis.scrollTo = () => {};
-require('./data.js'); require('./ui.js'); globalThis.LIB = require('./lib.js'); document.querySelectorAll = () => []; document.addEventListener = () => {};
+require('./data.js'); require('./docs.js'); require('./ui.js'); globalThis.LIB = require('./lib.js'); (0, eval)(readFileSync(new URL('./extra.js', import.meta.url), 'utf8')); document.querySelectorAll = () => []; document.addEventListener = () => {};
 // capturar el render por pestana: reejecutar app.js cambiando state.tab no es posible, asi que se evalua con un hook
-import { readFileSync } from 'node:fs'; let code = readFileSync(new URL('./app.js', import.meta.url), 'utf8');
+let code = readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 code = code.replace(/render\(\); activeTab\(\);\s*\}\)\(\);\s*$/, "globalThis.__t = { TABS, state, render, RENDER };})();");
 (0, eval)(code);
 const { TABS, state, RENDER, render } = globalThis.__t; let bad = 0;
