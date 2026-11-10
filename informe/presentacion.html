@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LobbyLink: dónde correrlo</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f3f2ee;
+  --surface: #fcfcfb;
+  --surface-2: #f3f2ee;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #6f6e69;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11,11,11,0.10);
+  --pc: #2a78d6;
+  --ct: #eb6834;
+  --ec2: #1baf7a;
+  --before: #b5b3aa;
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --bad: #d03b3b;
+  --accent: #2a78d6;
+  --accent-soft: #e6effb;
+  --bad-soft: #fbe9e9;
+  --bad-ink: #b02a2a;
+  --good-soft: #e5f4e5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --pc: #3987e5; --ct: #d95926; --ec2: #199e70; --before: #5c5b56;
+    --good-ink: #0ca30c; --accent: #3987e5; --accent-soft: #1b2a3d; --bad-soft: #3a1f1f; --bad-ink: #e66767; --good-soft: #1b301b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+  --pc: #3987e5; --ct: #d95926; --ec2: #199e70; --before: #5c5b56;
+  --good-ink: #0ca30c; --accent: #3987e5; --accent-soft: #1b2a3d; --bad-soft: #3a1f1f; --bad-ink: #e66767; --good-soft: #1b301b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--page); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+#stage {
+  position: absolute; left: 50%; top: 50%;
+  width: 1280px; height: 720px;
+  transform-origin: center center;
+}
+.slide {
+  position: absolute; inset: 0;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--ring), 0 10px 40px rgba(0,0,0,0.08);
+  padding: 56px 72px 64px;
+  display: none; flex-direction: column;
+}
+.slide.on { display: flex; }
+.slide h2 { font-size: 40px; line-height: 1.12; margin: 0 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
+.slide .kicker { font-size: 15px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.slide .lead { font-size: 22px; line-height: 1.4; color: var(--ink-2); margin: 0 0 24px; max-width: 1050px; text-wrap: pretty; }
+.slide p, .slide li { font-size: 21px; line-height: 1.45; }
+.slide ul { margin: 0; padding-left: 26px; }
+.slide li { margin-bottom: 10px; }
+.slide li::marker { color: var(--muted); }
+.foot { position: absolute; left: 72px; right: 72px; bottom: 22px; display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.src { font-size: 13px; color: var(--muted); margin-top: auto; padding-top: 10px; }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 0.88em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; }
+b, strong { font-weight: 650; }
+.row { display: flex; gap: 28px; }
+.col { flex: 1; min-width: 0; }
+.grow { flex: 1; min-height: 0; }
+.card { background: var(--surface-2); border-radius: 12px; padding: 20px 24px; }
+.card h3 { margin: 0 0 8px; font-size: 22px; }
+.card p { margin: 0; font-size: 18px; color: var(--ink-2); }
+.big { font-size: 64px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.mid { font-size: 40px; font-weight: 700; line-height: 1.05; }
+.unit { font-size: 0.45em; font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+.lbl { font-size: 15px; color: var(--ink-2); margin-top: 6px; }
+.pill { display: inline-block; font-size: 15px; font-weight: 600; padding: 3px 10px; border-radius: 99px; }
+.pill.ok { background: var(--good-soft); color: var(--good-ink); }
+.pill.no { background: var(--bad-soft); color: var(--bad-ink); }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+.legend { display: flex; gap: 22px; font-size: 16px; color: var(--ink-2); margin: 4px 0 10px; flex-wrap: wrap; }
+.chart { width: 100%; height: 100%; }
+.chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.chart text { fill: var(--ink-2); font-size: 15px; font-family: inherit; }
+.chart .muted { fill: var(--muted); font-size: 14px; }
+.chart .val { fill: var(--ink); font-size: 15px; font-weight: 600; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--axis); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: default; }
+.mk { transition: opacity 120ms ease; }
+.chart:hover .mk { opacity: 0.55; }
+.chart .mk.hl { opacity: 1; }
+table.t { border-collapse: collapse; width: 100%; font-size: 18px; }
+table.t th, table.t td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+table.t th { font-size: 15px; color: var(--ink-2); font-weight: 600; }
+table.t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.src a { color: inherit; }
+.flow { display: flex; align-items: center; gap: 14px; }
+.box { background: var(--surface-2); border-radius: 10px; padding: 14px 18px; font-size: 18px; text-align: center; }
+.arrow { color: var(--muted); font-size: 26px; }
+.qa { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.qa .card h3 { font-size: 20px; }
+.qa .card p { font-size: 17px; line-height: 1.4; }
+.tag { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.cover h1 { font-size: 64px; line-height: 1.05; margin: 0 0 20px; letter-spacing: -0.02em; max-width: 1000px; text-wrap: balance; }
+.machines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.machine { display: flex; flex-direction: column; border-radius: 12px; padding: 20px 22px; background: var(--surface-2); border-top: 6px solid var(--c); }
+.machine h3 { margin: 0 0 4px; font-size: 24px; }
+.machine .sub { font-size: 15px; color: var(--ink-2); margin-bottom: 14px; }
+.machine dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 17px; }
+.machine dt { color: var(--ink-2); }
+.machine dd { margin: 0; font-weight: 600; }
+.machine .key { margin: auto 0 0; padding-top: 14px; border-top: 1px solid var(--grid); font-size: 17px; line-height: 1.4; color: var(--ink); }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 30px; }
+.step { position: relative; display: flex; flex-direction: column; background: var(--surface-2); border-radius: 12px; padding: 18px 20px; }
+.step .tag { color: var(--accent); margin-bottom: 10px; }
+.step h3 { margin: 0 0 10px; font-size: 21px; line-height: 1.2; }
+.step .mid { font-size: 38px; }
+.step .lbl { font-size: 16px; line-height: 1.4; }
+.step .how { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--grid); font-size: 14px; color: var(--muted); line-height: 1.4; }
+.step:not(:last-child)::after { content: '→'; position: absolute; left: 100%; width: 30px; text-align: center; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 26px; font-weight: 600; }
+.formula { margin-top: 16px; padding: 12px 18px; border-radius: 10px; background: var(--accent-soft); font-size: 19px; }
+.verdict { border-radius: 12px; padding: 22px 26px; background: var(--accent-soft); }
+.hint { position: fixed; right: 16px; bottom: 12px; font-size: 13px; color: var(--muted); user-select: none; }
+.hint button { font: inherit; color: var(--ink-2); background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 6px 12px; cursor: pointer; margin-left: 6px; }
+.hint button:hover { color: var(--ink); }
+#bar { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); transition: width 200ms ease; }
+#notes {
+  position: fixed; left: 16px; right: 16px; bottom: 52px; max-height: 32vh; overflow: auto;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 12px;
+  padding: 14px 18px; font-size: 16px; line-height: 1.5; box-shadow: 0 8px 30px rgba(0,0,0,0.15); display: none;
+}
+#notes.on { display: block; }
+#notes .tag { margin-bottom: 4px; }
+.notes { display: none; }
+#tip {
+  position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--ring); border-radius: 8px; padding: 8px 12px; font-size: 14px; line-height: 1.4;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15); display: none; max-width: 280px;
+}
+#tip b { display: block; margin-bottom: 2px; }
+@media (prefers-reduced-motion: reduce) { #bar, .mk { transition: none; } }
+@media print {
+  @page { size: 1280px 720px; margin: 0; }
+  body { overflow: visible; background: #fff; }
+  #stage { position: static; transform: none !important; width: auto; height: auto; }
+  .slide { display: flex !important; position: relative; width: 1280px; height: 720px; page-break-after: always; box-shadow: none; border-radius: 0; }
+  .hint, #bar, #notes, #tip { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="stage">
+
+<!-- 1 -->
+<section class="slide cover" data-title="Portada">
+  <div class="kicker">Arquitectura Computacional · UCC · Proyecto final</div>
+  <h1>¿En qué máquina debe correr LobbyLink?</h1>
+  <p class="lead">Medimos la misma aplicación en un portátil, en un contenedor Docker y en una instancia de AWS, con la misma carga. Todo número de esta presentación sale de nuestras corridas.</p>
+  <div class="row" style="margin-top:auto">
+    <div class="card" style="flex:1"><div class="tag">Medido</div><p style="font-size:19px;color:var(--ink)">CPU, memoria, disco, red y tiempos de respuesta</p></div>
+    <div class="card" style="flex:1"><div class="tag">En</div><p style="font-size:19px;color:var(--ink)">3 máquinas × 2 versiones del código</p></div>
+    <div class="card" style="flex:1"><div class="tag">Carga</div><p style="font-size:19px;color:var(--ink)">Hasta 10 min por escalón, 3 repeticiones</p></div>
+  </div>
+  <aside class="notes">Presentarnos. La pregunta del proyecto es en qué máquina debería correr una aplicación real y con qué datos lo sostenemos. Elegimos LobbyLink. La regla que seguimos: cada afirmación tiene un número que medimos nosotros, y la carpeta cruda de donde sale.</aside>
+</section>
+
+<!-- 2 -->
+<section class="slide" data-title="Respuesta corta">
+  <div class="kicker">La respuesta en una diapositiva</div>
+  <h2>Una t3.small de AWS, pero solo después de arreglar el código</h2>
+  <p class="lead">El hallazgo más grande no fue la máquina: fue un error en el código que multiplicaba el trabajo por cada lobby.</p>
+  <div class="row grow" style="align-items:stretch">
+    <div class="card col"><div class="big">21<span class="unit">USD/mes</span></div><div class="lbl">Máquina y disco de la t3.small a 80 peticiones por segundo (16,78 USD hasta 40). Con la salida a internet: 334,74 USD</div></div>
+    <div class="card col"><div class="big">16<span class="unit">ms</span></div><div class="lbl">El 95 % de las peticiones responde en menos de 16 ms a 80 peticiones por segundo, 0 errores</div></div>
+    <div class="card col"><div class="big">×14</div><div class="lbl">Cuánto sube la capacidad de la t3.small al arreglar el código. Pasar al PC, con 4 veces más núcleos, la sube ×3</div></div>
+  </div>
+  <div class="src">Fuente: carga sostenida (F6) y rampa hasta el techo (F5), <code>resultados/ec2_t3small-unl-nplus1/</code>; costos en <code>resultados/_logs/creditos_ec2_unl_20261107.md</code></div>
+  <aside class="notes">Adelantamos la conclusión. Recomendamos una t3.small en modo Unlimited con el código corregido: 16,78 dólares al mes hasta 40 peticiones por segundo y 21,26 a 80. Lo importante es el tercer número: arreglar el código rindió mucho más que comprar una máquina más grande. El resto de la presentación muestra cómo llegamos a esto.</aside>
+</section>
+
+<!-- 3 -->
+<section class="slide" data-title="La aplicación">
+  <div class="kicker">La aplicación</div>
+  <h2>LobbyLink: una API para armar partidas</h2>
+  <p class="lead">Un usuario publica un lobby para un videojuego y otros se unen. Es Spring Boot (Java) con MongoDB. Leyendo el código vimos dos operaciones caras.</p>
+  <div class="row grow">
+    <div class="col">
+      <div class="card" style="height:100%">
+        <h3>1. Listar los lobbies</h3>
+        <p style="margin-bottom:18px">Devuelve <b>todos</b> los lobbies y, por cada uno, hace 2 consultas más a la base: cuántos jugadores tiene y qué juego es.</p>
+        <div class="flow">
+          <div class="box">1 petición</div><div class="arrow">→</div>
+          <div class="box">200 lobbies</div><div class="arrow">→</div>
+          <div class="box" style="background:var(--bad-soft)"><b>~406 consultas</b> a MongoDB</div>
+        </div>
+        <p style="margin-top:18px">A esto se le llama <b>problema N+1</b>: el trabajo crece con cada lobby nuevo.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" style="height:100%">
+        <h3>2. Login y registro</h3>
+        <p style="margin-bottom:18px">Las contraseñas se protegen con <b>BCrypt</b>, que a propósito hace 1.024 rondas de cálculo para que adivinarlas sea lento.</p>
+        <div class="flow">
+          <div class="box">1 login</div><div class="arrow">→</div>
+          <div class="box"><b>56 a 112 ms</b> de cálculo puro</div>
+        </div>
+        <p style="margin-top:18px">Es trabajo del procesador, sin disco ni red. Nos sirvió para comparar la velocidad de cada núcleo.</p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">LobbyLink es una API de Spring Boot con MongoDB. El listado es el centro de todo: por cada lobby hace dos consultas extra, unas 406 por petición con 200 lobbies. El login usa BCrypt, cálculo puro, que nos sirve para comparar la velocidad de cada núcleo.</aside>
+</section>
+
+<!-- 4 -->
+<section class="slide" data-title="El procedimiento">
+  <div class="kicker">Cómo elegimos la carga</div>
+  <h2>Cada número de carga sale del paso anterior</h2>
+  <p class="lead" style="margin-bottom:18px">Tasa fija de peticiones por segundo, conteste o no el servidor. Mezcla: 50 % listar y 50 % ver un lobby, de la colección Postman. Ejemplo con la t3.small y el código original:</p>
+  <div class="steps grow">
+    <div class="step">
+      <div class="tag">Paso 1 · F1</div>
+      <h3>Costo por petición</h3>
+      <div class="mid">85,8 <span class="unit">ms</span></div>
+      <div class="lbl">de CPU por petición de la mezcla: listar 167,4&nbsp;ms, ver 4,2&nbsp;ms.</div>
+      <div class="how">1 cliente, 120 s por endpoint.</div>
+    </div>
+    <div class="step">
+      <div class="tag">Paso 2 · modelo</div>
+      <h3>Techo predicho</h3>
+      <div class="mid">23,3 <span class="unit">req/s</span></div>
+      <div class="lbl">2.000 ms de CPU por segundo (2 vCPU) ÷ 85,8 ms. PC: 71. Contenedor: 20.</div>
+      <div class="how"><code>telemetry/model.mjs</code></div>
+    </div>
+    <div class="step">
+      <div class="tag">Paso 3 · F5</div>
+      <h3>Rampa hasta el techo</h3>
+      <div class="mid">51 <span class="unit">%</span></div>
+      <div class="lbl">del techo pasa (11,8&nbsp;req/s); al 62&nbsp;% falla. La CPU medida queda a 1–8 puntos de la predicha.</div>
+      <div class="how">10–150&nbsp;% del techo, 90 s por nivel.</div>
+    </div>
+    <div class="step">
+      <div class="tag">Paso 4 · F6</div>
+      <h3>Escalera sostenida</h3>
+      <div class="mid">5 → 80 <span class="unit">req/s</span></div>
+      <div class="lbl">Duplicando, para encerrar el codo de las tres máquinas con la misma escala.</div>
+      <div class="how">10 min por escalón, 3 repeticiones.</div>
+    </div>
+  </div>
+  <div class="formula"><b>Ley de utilización:</b> U = λ · D, así que el techo es X<sub>max</sub> = CPU disponible ÷ D. La rampa confirma el consumo y dice dónde se rompe la latencia.</div>
+  <div class="src">Costos por endpoint y techos: anexo 4.1. Rampa: anexo 4.5, <code>resultados/_logs/validacion_*_f5.md</code></div>
+  <aside class="notes">Si solo dijéramos que mandamos 10 o 20 peticiones por segundo, la pregunta sería por qué esos números. Primero medimos con un solo cliente cuánta CPU gasta cada petición: en la t3.small, 86 milisegundos en promedio. Con la ley de utilización eso da un techo de 23 por segundo. Después subimos la tasa en rampa hasta ese techo: la CPU se comportó como predijimos, pero la latencia se rompe a la mitad del techo. Con eso armamos la escalera.</aside>
+</section>
+
+<!-- 4b -->
+<section class="slide" data-title="La escalera">
+  <div class="kicker">Por qué 5, 10, 20, 40 y 80 req/s</div>
+  <h2>La escalera encierra el codo de cada máquina</h2>
+  <div class="legend"><span><i class="dot" style="background:var(--muted);opacity:.35"></i>Codo medido en la rampa (último que pasa → primero que falla)</span><span>◇ techo predicho</span><span>┆ escalones</span></div>
+  <div class="row grow">
+    <div class="col" style="flex:1.35; display:flex; flex-direction:column"><div class="chart grow" id="c-knee"></div></div>
+    <div class="col">
+      <ul>
+        <li>Cada escalón <b>duplica</b> el anterior, y la misma escalera va a las tres máquinas.</li>
+        <li><b>Contenedor y t3.small</b>: el codo está entre 10,2 y 14,5 req/s, así que 10 pasa y 20 falla.</li>
+        <li><b>PC</b>: el codo está entre 35,8 y 42,9. El escalón de 40 cae justo encima: por eso pasa en 2 de 3 repeticiones.</li>
+        <li><b>10 min</b> por escalón (3.000 a 48.000 peticiones) y <b>3 semillas</b>: carga sostenida, con muestras para el p99.</li>
+        <li><b>Pasa</b> si p95 ≤ 1 s y errores ≤ 1 %. Base nueva en cada corrida.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="src">Código original, <code>mezcla-lectura</code>. Codos: rampa hasta el techo (F5). Generador <code>telemetry/rate.mjs</code>; guion <code>campanas/campana.sh</code></div>
+  <aside class="notes">La escalera duplica: 5, 10, 20, 40 y 80. No es una estimación de usuarios: la fijamos sobre los codos de nuestra primera medición, y la rampa confirmó que los encierra. En el contenedor y la t3.small, 10 pasa y 20 falla. En el PC, 40 cae justo en el codo y pasa en dos de tres repeticiones.</aside>
+</section>
+
+<!-- 5 -->
+<section class="slide" data-title="Las máquinas">
+  <div class="kicker">Las tres opciones</div>
+  <h2>Mismo programa, tres máquinas muy distintas</h2>
+  <div class="machines grow" style="margin-top:14px">
+    <div class="machine" style="--c:var(--pc)">
+      <h3>PC (portátil)</h3>
+      <div class="sub">AMD Ryzen 7 7445HS · Windows 11</div>
+      <dl>
+        <dt>Núcleos</dt><dd>6 (12 hilos); a LobbyLink le dimos 4</dd>
+        <dt>Velocidad</dt><dd>4,7 GHz pico; ~2,1 GHz bajo carga en Windows</dd>
+        <dt>Caché L3</dt><dd>16 MB</dd>
+        <dt>RAM</dt><dd>16 GB DDR5</dd>
+        <dt>Disco</dt><dd>NVMe, 41.903 IOPS</dd>
+        <dt>Costo</dt><dd>~40 USD/mes (estimado)</dd>
+      </dl>
+      <p class="key"><b>Lo que la distingue:</b> 4 núcleos físicos para LobbyLink: el mayor techo medido.</p>
+    </div>
+    <div class="machine" style="--c:var(--ct)">
+      <h3>Contenedor Docker</h3>
+      <div class="sub">El mismo Ryzen, con límites puestos por nosotros</div>
+      <dl>
+        <dt>CPU</dt><dd>1 para la app + 1 para MongoDB</dd>
+        <dt>Velocidad</dt><dd>4,63 GHz medida</dd>
+        <dt>RAM</dt><dd>1 GB cada uno</dd>
+        <dt>Disco</dt><dd>virtual, 79.766 IOPS</dd>
+        <dt>Límite</dt><dd>100 ms de CPU cada 100 ms</dd>
+        <dt>Costo</dt><dd>~7 USD/mes (prorrateo: 2 de 12 hilos del PC)</dd>
+      </dl>
+      <p class="key"><b>Lo que la distingue:</b> un límite de CPU y de memoria que fijamos nosotros.</p>
+    </div>
+    <div class="machine" style="--c:var(--ec2)">
+      <h3>AWS EC2 t3.small</h3>
+      <div class="sub">Intel Xeon Platinum 8259CL · Ubuntu</div>
+      <dl>
+        <dt>Núcleos</dt><dd><b>1</b> (2 hilos = 2 vCPU)</dd>
+        <dt>Velocidad</dt><dd>3,07 GHz medida</dd>
+        <dt>RAM</dt><dd>1,9 GiB</dd>
+        <dt>Disco</dt><dd>EBS por red, 3.049 IOPS</dd>
+        <dt>Red</dt><dd>4.953 Mbit/s medida</dd>
+        <dt>Costo</dt><dd>0,0208 USD/h + créditos</dd>
+      </dl>
+      <p class="key"><b>Lo que la distingue:</b> un solo núcleo físico, racionado con créditos de CPU.</p>
+    </div>
+  </div>
+  <div class="src">Velocidad, IOPS y red medidos por nosotros (microbenchmark, <code>fio</code>, <code>iperf3</code>), no tomados de la ficha.</div>
+  <aside class="notes">El PC es un portátil con Ryzen: 4 núcleos para LobbyLink y el resto para el generador. Ojo: en Windows medimos que los hilos de la app corren a unos 2,1 GHz, no a 4,7. El contenedor es el mismo Ryzen con 1 CPU y 1 GB para la app y lo mismo para MongoDB. La t3.small parece tener 2 CPU, pero son los dos hilos de un solo núcleo, y eso explica casi todo.</aside>
+</section>
+
+<!-- 6 -->
+<section class="slide" data-title="Resultado con el código original">
+  <div class="kicker">Resultado 1 · código original</div>
+  <h2>Con el código original, ninguna aguanta más de 20 req/s</h2>
+  <div class="legend"><span><i class="dot" style="background:var(--pc)"></i>PC</span><span><i class="dot" style="background:var(--ct)"></i>Contenedor</span><span><i class="dot" style="background:var(--ec2)"></i>t3.small</span><span>✕ = el escalón falla</span><span>○ punteado = pasa solo en 2 de 3 repeticiones</span></div>
+  <div class="row grow">
+    <div class="col" style="flex:1.5; display:flex; flex-direction:column"><div class="chart grow" id="c-p95-base"></div></div>
+    <div class="col">
+      <div class="card" style="margin-bottom:14px"><div class="mid">20 <span class="unit">req/s</span></div><div class="lbl">Máximo del PC (40 pasa solo en 2 de 3 repeticiones)</div></div>
+      <div class="card" style="margin-bottom:14px"><div class="mid">10 <span class="unit">req/s</span></div><div class="lbl">Máximo del contenedor y de la t3.small</div></div>
+      <div class="card"><p>Cuando falla, falla entero: a 20 req/s la t3.small solo contesta ~2 por segundo y el 89 % de las peticiones se cae.</p></div>
+    </div>
+  </div>
+  <div class="src">p95 por escalón, peor de las 3 repeticiones que pasan. Fuente: <code>*_f6-mezcla-lectura-r*</code></div>
+  <aside class="notes">Esta es la carga sostenida con el código original. El eje es el p95: el tiempo en que responde el 95 % de las peticiones. La línea punteada es nuestro límite de 1 segundo. El contenedor y la t3.small llegan a 10 peticiones por segundo; el PC a 20. Arriba de eso el sistema colapsa: no se pone un poco más lento, deja de responder.</aside>
+</section>
+
+<!-- 7 -->
+<section class="slide" data-title="Dónde espera">
+  <div class="kicker">¿Dónde espera la aplicación?</div>
+  <h2>En el procesador. El disco y la red casi no trabajan</h2>
+  <p class="lead">t3.small, código original, 10 req/s: cuánto de cada recurso se usa, frente a lo que medimos que puede dar.</p>
+  <div class="row grow">
+    <div class="col" style="flex:1.4; display:flex; flex-direction:column"><div class="chart grow" id="c-where"></div></div>
+    <div class="col">
+      <ul>
+        <li><b>CPU</b>: 48,2 % promedio, picos de 99,5 %; cálculo (<code>us</code>) 39,9 %.</li>
+        <li><b>Esperando al disco</b> (<code>wa</code>): <b>0,0 %</b>. 1 IOPS de 354 posibles.</li>
+        <li><b>Red</b>: 0,17 MB/s de salida, el 0,03 % del enlace.</li>
+        <li><b>Memoria residente</b>: 449 de 1.905 MB (app 260, MongoDB 189); <b>0 %</b> de fallos de caché.</li>
+        <li><b>Quién</b>: MongoDB usa 62 % de un núcleo y la app 34 %. El N+1 examina ~40.800 documentos por listado.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="src">Fuente: <code>ec2_t3small-unl/f6-mezcla-lectura-r1</code>; techos de disco y red de la prueba de capacidad del hardware (F0: <code>fio</code>, <code>iperf3</code>)</div>
+  <aside class="notes">Esta es la pregunta central. La respuesta es CPU: casi la mitad del tiempo ocupada con picos de 99 %, y cero tiempo esperando al disco, que hace una operación por segundo. La red usa el 0,03 % del enlace y la memoria residente es la cuarta parte de la RAM, con todo en caché. Y quien gasta la CPU es MongoDB, casi el doble que Java, por el N+1.</aside>
+</section>
+
+<!-- 9 -->
+<section class="slide" data-title="Por qué: núcleos">
+  <div class="kicker">¿Qué componente lo causa?</div>
+  <h2>El número de núcleos físicos marca el techo</h2>
+  <div class="row grow">
+    <div class="col" style="display:flex; flex-direction:column">
+      <div class="chart grow" id="c-amdahl"></div>
+      <div class="legend" style="margin-top:6px"><span><i class="dot" style="background:var(--pc)"></i>PC (4 núcleos)</span><span><i class="dot" style="background:var(--ec2)"></i>t3.small (1 núcleo, 2 hilos)</span></div>
+    </div>
+    <div class="col">
+      <ul>
+        <li>Con más clientes a la vez, el PC sube hasta <b>8</b>; la t3.small se estanca en <b>2</b>.</li>
+        <li>El código se reparte bien: solo el <b>1,9 %</b> es secuencial (ley de Amdahl, p = 0,981).</li>
+        <li>La t3.small da p = 0,743 con el mismo código: no es el código, son <b>sus 2 vCPU sobre 1 solo núcleo</b>. El segundo hilo suma +59 %, no +100 %.</li>
+        <li>Su núcleo además es más lento: BCrypt tarda <b>1,48×</b> más y su reloj medido es <b>1,51×</b> menor.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="src">Listado en bucle cerrado, 60 s por nivel (prueba de paralelismo, F3). Fuente: <code>_logs/amdahl_windows_v3-f3.md</code>, <code>ec2_t3small-unl/_logs/amdahl_ec2_f3.md</code></div>
+  <aside class="notes">Subimos los clientes simultáneos. El PC gana hasta 8, sus 4 núcleos con 2 hilos; la t3.small se estanca en 2. Por Amdahl el código es 98 % paralelo. En la t3.small sale peor con el mismo código: el límite no es el software, son dos vCPU sobre un solo núcleo físico, y además más lento.</aside>
+</section>
+
+<!-- 10 -->
+<section class="slide" data-title="Contenedor">
+  <div class="kicker">El caso del contenedor</div>
+  <h2>En Docker manda el límite que nosotros pusimos</h2>
+  <div class="row grow">
+    <div class="col" style="flex:1.3; display:flex; flex-direction:column">
+      <div class="chart grow" id="c-quota"></div>
+    </div>
+    <div class="col">
+      <ul>
+        <li>Darle <b>4 CPU a la app</b> no cambia nada: 18,0 → 17,8 req/s.</li>
+        <li>Darle <b>2 CPU a MongoDB</b> lo sube a 26,9 req/s. El cuello era MongoDB.</li>
+        <li>Al agotar sus 100 ms de cuota, el kernel <b>congela</b> sus hilos hasta el siguiente periodo: hasta 5.160 ms de espera por segundo, sumados sobre las CPU donde esperaban.</li>
+        <li>Con 1 GB visible, Java se toma solo <b>256 MB</b> de memoria. Con mucha carga o muchos datos, se le acaba.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="src">Máximo req/s en bucle cerrado, código original (reparto de cuotas del contenedor, F4). Fuente: <code>*_docker_v3-f4-*</code></div>
+  <aside class="notes">Probamos repartos de CPU. Darle 4 a la aplicación no mejora; darle 2 a MongoDB sube casi 50 %: el cuello es MongoDB. El kernel congela el contenedor cuando gasta sus 100 ms; el frenado pasa de 1.000 ms por segundo porque se suma por cada CPU. Y Java, al ver 1 GB, se queda con 256 MB de heap.</aside>
+</section>
+
+<!-- 11 -->
+<section class="slide" data-title="El arreglo">
+  <div class="kicker">El cambio</div>
+  <h2>Arreglamos el listado: de ~406 consultas a 2</h2>
+  <p class="lead">Contamos los jugadores de todos los lobbies en una sola consulta y traemos todos los juegos de una vez. Sin índices nuevos y con respuestas idénticas (95 de 95 comparadas).</p>
+  <div class="legend"><span><i class="dot" style="background:var(--before)"></i>Código original</span><span><i class="dot" style="background:var(--accent)"></i>Código corregido</span></div>
+  <div class="row grow">
+    <div class="col" style="display:flex; flex-direction:column"><div class="tag" style="margin-bottom:4px">CPU por listado (ms)</div><div class="chart grow" id="c-fix-ms"></div></div>
+    <div class="col" style="display:flex; flex-direction:column"><div class="tag" style="margin-bottom:4px">Techo predicho (req/s)</div><div class="chart grow" id="c-fix-max"></div></div>
+  </div>
+  <div class="src">Costo por petición (F1), con un cliente, y modelo U = λ·D. Equivalencia: <code>telemetry/comparar_respuestas.mjs</code>, <code>resultados/_equivalencia_20261109_ec2/</code></div>
+  <aside class="notes">El arreglo cambia un solo archivo. En vez de una consulta por lobby, una sola agregación cuenta todo, y los videojuegos se traen juntos. Comprobamos que la API responde exactamente lo mismo. El costo de un listado bajó entre 24 y 31 veces, y el techo predicho de la t3.small pasó de 23,3 a 336,5 peticiones por segundo.</aside>
+</section>
+
+<!-- 12 -->
+<section class="slide" data-title="Resultado con el código corregido">
+  <div class="kicker">Resultado 2 · código corregido</div>
+  <h2>Con el arreglo, las tres pasan toda la escalera</h2>
+  <div class="legend"><span><i class="dot" style="background:var(--pc)"></i>PC</span><span><i class="dot" style="background:var(--ct)"></i>Contenedor</span><span><i class="dot" style="background:var(--ec2)"></i>t3.small</span><span><i class="dot" style="background:none;border-top:2px dashed var(--muted);border-radius:0;height:0;width:18px;vertical-align:4px"></i>Código original, como referencia</span></div>
+  <div class="row grow">
+    <div class="col" style="flex:1.5; display:flex; flex-direction:column"><div class="chart grow" id="c-p95-fix"></div></div>
+    <div class="col">
+      <div class="card" style="margin-bottom:14px"><div class="mid">12–23 <span class="unit">ms</span></div><div class="lbl">p95 en todos los escalones, antes 393–478 ms</div></div>
+      <div class="card" style="margin-bottom:14px"><div class="mid">0 <span class="unit">errores</span></div><div class="lbl">En las tres máquinas y todas las repeticiones</div></div>
+      <div class="card"><div class="mid">28,8 <span class="unit">%</span></div><div class="lbl">CPU de la t3.small a 80 req/s (antes 48,2 % a solo 10)</div></div>
+    </div>
+  </div>
+  <div class="src">Misma escala que el resultado 1. PC y contenedor casi se superponen (20–23 ms). El PC pasó también 160 y 320 req/s.</div>
+  <aside class="notes">Misma prueba, mismo eje, código corregido. Las tres máquinas pasan los cinco escalones con 0 errores, y el tiempo de respuesta cae de cientos de milisegundos a unos 15 o 20. La t3.small a 80 peticiones por segundo usa menos CPU que antes a 10.</aside>
+</section>
+
+<!-- 13 -->
+<section class="slide" data-title="Carga por diez">
+  <div class="kicker">Si la carga se multiplica por diez</div>
+  <h2>¿Qué se rompe primero?</h2>
+  <table class="t" style="margin-top:10px">
+    <thead><tr><th style="width:26%">Prueba</th><th>PC</th><th>Contenedor</th><th>t3.small</th><th style="width:30%">Qué se rompe</th></tr></thead>
+    <tbody>
+      <tr><td><b>Tráfico ×10</b><br><span style="color:var(--ink-2);font-size:15px">100 req/s, original</span></td><td><span class="pill no">✕ 100 % errores</span></td><td><span class="pill no">✕ 100 % errores</span></td><td><span class="pill no">✕ 100 % errores</span></td><td>La <b>CPU</b> (t3.small al 99,9 %), como predijimos antes de medir</td></tr>
+      <tr><td><b>Tráfico ×10</b><br><span style="color:var(--ink-2);font-size:15px">100 req/s, corregido</span></td><td><span class="pill ok">✓ p95 19,9 ms</span></td><td><span class="pill ok">✓ p95 20,7 ms</span></td><td><span class="pill ok">✓ p95 16,4 ms</span></td><td>Nada. t3.small al 34 % (predicho 30 %)</td></tr>
+      <tr><td><b>Datos ×10</b><br><span style="color:var(--ink-2);font-size:15px">2.000 lobbies, original</span></td><td><span class="pill no">✕ 99 % errores</span></td><td><span class="pill no">✕ 99 % errores</span></td><td><span class="pill no">✕ 99 % errores</span></td><td>La <b>CPU</b> de MongoDB (el trabajo crece con el cuadrado de los lobbies); en el contenedor cede antes el <b>heap</b> de Java</td></tr>
+      <tr><td><b>Datos ×10</b><br><span style="color:var(--ink-2);font-size:15px">2.000 lobbies, corregido</span></td><td><span class="pill ok">✓ 45 ms</span></td><td><span class="pill ok">✓ 45 ms</span></td><td><span class="pill ok">✓ 62 ms</span></td><td>Nada</td></tr>
+      <tr><td><b>Datos ×100</b><br><span style="color:var(--ink-2);font-size:15px">20.000 lobbies, corregido</span></td><td><span class="pill ok">✓ 336 ms</span></td><td><span class="pill no">✕ 100 % errores</span></td><td><span class="pill no">✕ 100 % errores</span></td><td>La <b>memoria</b> de Java: el listado sin paginar arma respuestas enormes</td></tr>
+    </tbody>
+  </table>
+  <div class="src">Predicción escrita antes de medir en <code>resultados/_logs/prediccion_*</code>. Carga por diez (F7) y datos por diez y por cien (F7d), 600 s por prueba.</div>
+  <aside class="notes">Con el código original, diez veces más tráfico o datos tumban las tres máquinas por CPU, como predijimos por escrito; en el contenedor el heap de Java cede incluso antes. Con el código corregido aguantan. Con cien veces los datos se rompe la memoria de Java donde hay poca; solo el PC aguanta.</aside>
+</section>
+
+<!-- 14 -->
+<section class="slide" data-title="Costo">
+  <div class="kicker">Cuánto cuesta al mes, a la misma carga</div>
+  <h2>A la misma carga, la máquina es barata y la red es cara</h2>
+  <table class="t" style="margin-top:6px">
+    <thead><tr><th style="width:34%">USD al mes</th><th>10 req/s<br>código original</th><th>80 req/s<br>código corregido</th><th>Por millón de peticiones<br>a 80 req/s</th></tr></thead>
+    <tbody>
+      <tr><td><b>PC</b><br><span style="color:var(--ink-2);font-size:15px">estimado: depreciación + energía</span></td><td class="n">39,84–41,39</td><td class="n">39,84–41,39</td><td class="n">0,19–0,20</td></tr>
+      <tr><td><b>Contenedor</b><br><span style="color:var(--ink-2);font-size:15px">prorrateo: 2 de 12 hilos del PC</span></td><td class="n">6,64–6,92</td><td class="n">6,64–6,92</td><td class="n">0,03</td></tr>
+      <tr><td><b>t3.small</b><br><span style="color:var(--ink-2);font-size:15px">instancia + disco + créditos medidos</span></td><td class="n"><b>35,91</b> <span style="color:var(--bad)">(19,13 de créditos)</span></td><td class="n"><b>21,26</b> (4,48 de créditos)</td><td class="n">0,10</td></tr>
+      <tr><td><b>t3.small + salida a internet</b><br><span style="color:var(--ink-2);font-size:15px">0,09 USD/GB tras 100 GB gratis</span></td><td class="n">67,02</td><td class="n"><b style="color:var(--bad)">334,74</b></td><td class="n">1,59</td></tr>
+    </tbody>
+  </table>
+  <div class="row" style="margin-top:16px">
+    <div class="col"><ul>
+      <li><b>Misma carga para todas</b>: 10 req/s es lo que aguanta el código original en las tres; 80 req/s, el corregido.</li>
+      <li>Con el código original, los <b>créditos</b> (19,13 USD) cuestan más que la instancia (15,18).</li>
+    </ul></div>
+    <div class="col"><ul>
+      <li>La <b>salida</b> domina: el listado sin páginas manda ~18 KB por respuesta, 3.583 GiB al mes a 80 req/s. Desde ~8 req/s la t3.small ya cuesta más que el PC.</li>
+      <li>PC y contenedor no incluyen plan de internet ni IP pública: no son precio de mercado.</li>
+    </ul></div>
+  </div>
+  <div class="src">730 h/mes. Créditos en CloudWatch: <code>resultados/_logs/creditos_ec2_unl_20261107.md</code>. Salida medida en la carga sostenida (F6); tarifas en <code>resultados/_aws_precios_20261108/precios.md</code>. Anexo, capítulo 8</div>
+  <aside class="notes">Comparamos a la misma carga. A 10 peticiones por segundo con el código original, la t3.small paga 19 dólares de créditos, más que la instancia. Corregida, a 80 cuesta 21 de máquina. Pero si los clientes están en internet, AWS cobra la salida: 335 dólares al mes, porque el listado sin páginas manda 18 KB por respuesta.</aside>
+</section>
+
+<!-- 14b -->
+<section class="slide" data-title="Escala real">
+  <div class="kicker">Referencia externa: no es una medición nuestra</div>
+  <h2>¿Y si LobbyLink tuviera los usuarios de Discord en 2016?</h2>
+  <div class="row grow" style="margin-top:6px">
+    <div class="col">
+      <div class="tag" style="margin-bottom:10px">Lo que publicó Discord</div>
+      <ul>
+        <li><b>2,4 M</b> de usuarios conectados a la vez (julio de 2016), con más de 2 PB al mes servidos desde la caché de Cloudflare.</li>
+        <li>Poner esa caché delante le ahorró <b>más de 100.000 USD al mes</b> de Google Cloud: su factura era mayor que eso.</li>
+        <li>Guardaba los mensajes en <b>MongoDB</b> y lo dejó a los 100 millones de mensajes, cuando «los datos y el índice ya no cabían en RAM y la latencia se volvió impredecible». En F9 lo vimos en pequeño: fuera de la caché, el p95 subió de 28 a 121 ms.</li>
+        <li>Hoy: más de <b>90 M</b> de usuarios diarios (cuarto trimestre de 2025).</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="tag" style="margin-bottom:10px">Cuenta de servilleta con nuestros números</div>
+      <table class="t">
+        <tbody>
+          <tr><td>Supuesto: cada usuario conectado hace una petición cada</td><td class="n"><b>10 s</b></td></tr>
+          <tr><td>Usuarios por t3.small corregida (80 req/s)</td><td class="n">~800</td></tr>
+          <tr><td>2,4 M usuarios → 240.000 req/s</td><td class="n"><b>3.000</b> t3.small</td></tr>
+          <tr><td>Máquinas (3.000 × 21,26 USD)</td><td class="n">~64.000 USD/mes</td></tr>
+          <tr><td>Con salida a internet (~10 PB)</td><td class="n"><b style="color:var(--bad)">~1 M USD/mes</b></td></tr>
+        </tbody>
+      </table>
+      <div class="verdict" style="margin-top:16px"><p style="margin:0;font-size:18px">A escala, la máquina es lo barato: cuesta la red. Por eso Discord pone una caché delante, y LobbyLink tendría que paginar el listado. La cuenta es lineal a propósito: no incluye réplicas, base distribuida, voz ni picos.</p></div>
+    </div>
+  </div>
+  <div class="src">Fuentes externas: <a href="https://www.cloudflare.com/case-studies/discord/">caso Discord de Cloudflare</a> · <a href="https://discord.com/blog/how-discord-stores-billions-of-messages">blog de Discord, 13-01-2017</a> · <a href="https://discord.com/company">discord.com/company</a>. Lo nuestro: 80 req/s, 21,26 y 334,74 USD (anexo, capítulo 8).</div>
+  <aside class="notes">Para dimensionar, una cuenta de servilleta, no una medición. Si cada usuario pide algo cada 10 segundos, una t3.small atiende unos 800. Con los 2,4 millones de Discord en 2016 serían 3.000 instancias: 64.000 dólares en máquinas y un millón con la red. Discord se ahorró 100.000 al mes con una caché, y dejó MongoDB cuando sus datos no cupieron en RAM.</aside>
+</section>
+
+<!-- 15 -->
+<section class="slide" data-title="Recomendación">
+  <div class="kicker">Recomendación</div>
+  <h2>t3.small en modo Unlimited, con el código corregido</h2>
+  <div class="row grow" style="margin-top:10px">
+    <div class="col">
+      <div class="verdict" style="margin-bottom:18px">
+        <p style="margin:0 0 10px;font-size:22px"><b>16,78 USD/mes</b> hasta 40 req/s · <b>21,26 USD/mes</b> a 80 req/s</p>
+        <p style="margin:0 0 10px;font-size:17px;color:var(--ink-2)">Con salida a internet: 47,81 USD a 10 req/s y 334,74 a 80 req/s.</p>
+        <p style="margin:0;font-size:19px;color:var(--ink-2)">A 80 req/s usa 28,8 % de CPU (nuestra regla pide ≤ 60 %), p95 de 16 ms y 0 errores en 3 repeticiones. Con el tráfico ×10 usa el 34 %.</p>
+      </div>
+      <p style="margin:0;font-size:19px">Vale mientras haya <b>pocos miles de lobbies</b>. Antes de 20.000 hay que paginar el listado.</p>
+    </div>
+    <div class="col">
+      <div class="tag" style="margin-bottom:10px">Opciones descartadas</div>
+      <ul>
+        <li><b>t3.small Standard</b>: sin créditos se frena a 0,4 vCPU; con el código original solo atiende 2 req/s.</li>
+        <li><b>PC</b>: tiene la mayor capacidad, pero no es un servidor (Windows, sin IP pública ni respaldo).</li>
+        <li><b>Contenedor</b>: aguanta lo mismo que la t3.small, pero corre sobre el PC y se queda sin memoria con 20.000 lobbies.</li>
+        <li><b>Una nube como el PC</b> (c7a.2xlarge): 301 USD/mes, 18 veces más, para capacidad que no hace falta.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">Recomendamos la t3.small en Unlimited con el arreglo. Cumple con mucho margen y es la más barata entre las que son un servidor de verdad. Descartamos Standard porque cuando se acaban los créditos la frena; el PC porque no es un servidor; el contenedor porque tiene las mismas carencias del PC; y una instancia grande porque cuesta 18 veces más para nada.</aside>
+</section>
+
+<!-- 16 -->
+<section class="slide" data-title="Lo que falta">
+  <div class="kicker">Dónde falla ahora y qué no medimos</div>
+  <h2>El arreglo movió el límite, no lo eliminó</h2>
+  <div class="row grow" style="margin-top:8px">
+    <div class="col">
+      <div class="tag" style="margin-bottom:10px">Límites que quedan</div>
+      <ul>
+        <li><b>El listado no tiene páginas</b>: con 20.000 lobbies la respuesta no cabe en la memoria de la t3.small.</li>
+        <li><b>El login no cambió</b>: BCrypt cuesta 83,6 ms, así que la t3.small aguanta ~24 logins por segundo como máximo.</li>
+        <li>La CPU sigue siendo el techo, ahora en 268 req/s en la t3.small.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="tag" style="margin-bottom:10px">Lo que no medimos</div>
+      <ul>
+        <li>La paginación, que sería el siguiente arreglo.</li>
+        <li>Tráfico real: la mezcla sale de la colección Postman.</li>
+        <li>Contadores de hardware: las explicaciones de caché y SMT salen de microbenchmarks.</li>
+        <li>En el PC, el generador de carga corre en la misma máquina.</li>
+      </ul>
+    </div>
+  </div>
+  <aside class="notes">El arreglo no resolvió todo: el listado sigue sin paginación y el login sigue caro. No medimos tráfico real ni contadores de hardware. Todo está en el anexo con sus carpetas. Gracias.</aside>
+</section>
+
+<!-- 17 -->
+<section class="slide" data-title="Preguntas">
+  <div class="kicker">Respaldo para preguntas</div>
+  <h2>Las cuatro preguntas típicas, en corto</h2>
+  <div class="qa grow" style="margin-top:6px">
+    <div class="card"><h3>¿Por qué ese número y no otro?</h3><p>Medimos la CPU de cada petición con un solo cliente (F1): techo = CPU ÷ costo. La rampa (F5) midió la CPU a 1–8 puntos de lo predicho y el codo al 50–62 % del techo. La escalera 5–80 encierra esos codos.</p></div>
+    <div class="card"><h3>¿Qué componente lo causa?</h3><p>Los núcleos físicos (4 contra 1), la frecuencia por hilo (1,51× entre Ryzen y Xeon), el SMT (el segundo hilo suma +59 % a +84 %), la cuota del contenedor y la caché de MongoDB, que deja al disco sin trabajo.</p></div>
+    <div class="card"><h3>¿Qué se rompe con ×10?</h3><p>Código original: la CPU, en las tres máquinas, como predijimos por escrito (en el contenedor, antes el heap). Corregido: nada. Con ×100 datos se rompe la memoria de Java.</p></div>
+    <div class="card"><h3>¿Qué descartaron y por qué?</h3><p>Standard (se frena sin créditos), el PC (no es servidor), el contenedor (mismas carencias y poca memoria) y una instancia grande (18× más cara).</p></div>
+  </div>
+  <aside class="notes">Diapositiva de respaldo para la ronda de preguntas.</aside>
+</section>
+
+<!-- respaldo: CPU por proceso -->
+<section class="slide" data-title="Respaldo: quién gasta la CPU">
+  <div class="kicker">Respaldo · ¿quién gasta esa CPU?</div>
+  <h2>La base de datos trabaja más que la aplicación</h2>
+  <div class="legend"><span><i class="dot" style="background:var(--accent)"></i>Aplicación Java</span><span><i class="dot" style="background:var(--ct)"></i>MongoDB</span></div>
+  <div class="row grow">
+    <div class="col" style="flex:1.3; display:flex; flex-direction:column"><div class="chart grow" id="c-who"></div></div>
+    <div class="col">
+      <p style="margin-top:0">Cada listado hace ~406 consultas y examina unos <b>40.800 documentos</b> para devolver 200 lobbies.</p>
+      <p>Por eso MongoDB gasta entre el <b>58 y el 75 %</b> del costo del listado.</p>
+      <div class="card" style="margin-top:12px"><p>Un listado ocupa la CPU <b>167 ms</b> en la t3.small, y tarda 153 ms en responder: casi todo su tiempo es calcular consultas, no esperar.</p></div>
+    </div>
+  </div>
+  <div class="src">% de un núcleo, promedio a 10 req/s. Fuente: carga sostenida (F6), repetición 1, de cada máquina, y costo por petición (F1: <code>resultados/_logs/modelo_*</code>)</div>
+  <aside class="notes">Si preguntan qué proceso gasta la CPU. Separamos la CPU por proceso. En las tres máquinas MongoDB gasta más que Java. En el PC, 77 contra 27 por ciento de un núcleo. La causa es el N+1: miles de documentos examinados por cada listado. Y el tiempo de respuesta es casi igual a la CPU usada, así que la petición no está esperando nada: está calculando.</aside>
+</section>
+
+<!-- 18 -->
+<section class="slide" data-title="Respaldo: disco">
+  <div class="kicker">Respaldo · ¿y si los datos no caben en memoria?</div>
+  <h2>Ni así el disco es el problema</h2>
+  <p class="lead">t3.small con 1.000.000 de lobbies (3.117 MB, más que sus 1,9 GiB de RAM), pidiendo lobbies al azar.</p>
+  <div class="row grow">
+    <div class="card col"><div class="mid">0 → 12–14 %</div><div class="lbl">Fallos de caché de MongoDB</div></div>
+    <div class="card col"><div class="mid">365 <span class="unit">IOPS</span></div><div class="lbl">A 400 req/s: el 12 % de las 3.049 que da su disco</div></div>
+    <div class="card col"><div class="mid">28 → 121 <span class="unit">ms</span></div><div class="lbl">p95; todos los escalones siguen pasando</div></div>
+    <div class="card col"><div class="mid">72 <span class="unit">%</span></div><div class="lbl">CPU con y sin la base en memoria: se llena antes que el disco</div></div>
+  </div>
+  <div class="src">Datos fuera de memoria (F9): <code>resultados/ec2_t3small-pend/f9-frio</code> contra <code>f9-caliente</code></div>
+  <aside class="notes">Si preguntan por el disco: forzamos una base más grande que la memoria. El disco empieza a trabajar, pero solo usa el 12 por ciento de su capacidad y la CPU sigue llenándose primero.</aside>
+</section>
+
+<!-- 19 -->
+<section class="slide" data-title="Respaldo: reproducir">
+  <div class="kicker">Respaldo · reproducibilidad</div>
+  <h2>Todo se puede repetir</h2>
+  <div class="row grow" style="margin-top:10px">
+    <div class="col">
+      <ul>
+        <li><b>Datos crudos</b>: <code>lobbylink_perfv3/resultados/</code>, una carpeta por corrida con la carga, la telemetría, el log y la configuración.</li>
+        <li><b>Guiones</b>: <code>campanas/campana.sh</code> corre todas las fases en el mismo orden en las tres máquinas.</li>
+        <li><b>Semillas fijas</b>: la misma semilla repite la misma secuencia de peticiones.</li>
+        <li><b>Visor</b>: <code>dashboard/index.html</code> muestra cada corrida segundo a segundo.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <div class="card">
+        <div class="tag" style="margin-bottom:8px">Comandos</div>
+        <p style="font-family:ui-monospace,Consolas,monospace;font-size:15px;line-height:1.7;color:var(--ink)">
+          ./campanas/campana.sh windows,docker<br>
+          ./campanas/campana.sh ec2 &lt;IP&gt; &lt;etiqueta&gt;<br>
+          JAR=jars/disenofinal-nplus1-fix.jar ./campanas/campana.sh …<br>
+          node telemetry/report.mjs resultados/&lt;carpeta&gt;
+        </p>
+      </div>
+    </div>
+  </div>
+  <aside class="notes">Si preguntan cómo repetirlo: todo está en el repositorio con guiones y datos crudos.</aside>
+</section>
+
+</div>
+
+<div id="notes"><div class="tag" id="notes-title"></div><div id="notes-body"></div></div>
+<div id="tip"></div>
+<div class="hint"><span id="count"></span><button id="prev" aria-label="Anterior">←</button><button id="next" aria-label="Siguiente">→</button><button id="nbtn" title="Notas del orador (N)">Notas</button><button id="tbtn" title="Tema claro u oscuro (T)">Tema</button></div>
+
+<script>
+'use strict';
+// ---------- navegación
+const slides = [...document.querySelectorAll('.slide')];
+const stage = document.getElementById('stage');
+let cur = 0;
+function fit() {
+  const s = Math.min(innerWidth / 1320, (innerHeight - 40) / 760);
+  stage.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+function show(i) {
+  cur = Math.max(0, Math.min(slides.length - 1, i));
+  slides.forEach((s, k) => s.classList.toggle('on', k === cur));
+  document.getElementById('count').textContent = `${cur + 1} / ${slides.length}`;
+  document.getElementById('bar').style.width = `${((cur + 1) / slides.length) * 100}%`;
+  const n = slides[cur].querySelector('.notes');
+  document.getElementById('notes-title').textContent = `Notas · ${cur + 1}. ${slides[cur].dataset.title || ''}`;
+  document.getElementById('notes-body').textContent = n ? n.textContent : '';
+  try { history.replaceState(null, '', '#' + (cur + 1)); } catch (e) {}
+  drawAll();
+}
+addEventListener('keydown', (e) => {
+  if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+  else if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); show(cur - 1); }
+  else if (e.key === 'Home') show(0);
+  else if (e.key === 'End') show(slides.length - 1);
+  else if (e.key === 'n' || e.key === 'N') toggleNotes();
+  else if (e.key === 't' || e.key === 'T') toggleTheme();
+  else if (e.key === 'f' || e.key === 'F') { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); }
+});
+document.getElementById('prev').onclick = () => show(cur - 1);
+document.getElementById('next').onclick = () => show(cur + 1);
+function toggleNotes() { document.getElementById('notes').classList.toggle('on'); }
+document.getElementById('nbtn').onclick = toggleNotes;
+function toggleTheme() {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme = dark ? 'light' : 'dark';
+  try { localStorage.setItem('ll-theme', r.dataset.theme); } catch (e) {}
+  drawAll(true);
+}
+document.getElementById('tbtn').onclick = toggleTheme;
+try { const t = localStorage.getItem('ll-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+let sx = null;
+addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+addEventListener('touchend', (e) => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) show(cur + (dx < 0 ? 1 : -1)); sx = null; });
+addEventListener('resize', fit);
+
+// ---------- utilidades de gráfico
+const NS = 'http://www.w3.org/2000/svg';
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const nf = (v, d = 0) => v.toLocaleString('es-CO', { minimumFractionDigits: d, maximumFractionDigits: d });
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const tip = document.getElementById('tip');
+function bindTip(node, html, group) {
+  node.addEventListener('mousemove', (e) => {
+    tip.innerHTML = html; tip.style.display = 'block';
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+    if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    (group || []).forEach((g) => g.classList.add('hl'));
+  });
+  node.addEventListener('mouseleave', () => { tip.style.display = 'none'; (group || []).forEach((g) => g.classList.remove('hl')); });
+}
+function svgFor(id) {
+  const box = document.getElementById(id);
+  box.innerHTML = '';
+  const W = box.clientWidth || 600, H = box.clientHeight || 360;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' }, box);
+  return { svg, W, H, box };
+}
+// barra con extremo de datos redondeado (4 px) y anclada a la base
+function barPath(x, y0, w, y1, r = 4) {
+  const top = Math.min(y0, y1), h = Math.abs(y0 - y1);
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y0} V${top + r} Q${x},${top} ${x + r},${top} H${x + w - r} Q${x + w},${top} ${x + w},${top + r} V${y0} Z`;
+}
+function hbarPath(x0, y, x1, h, r = 4) {
+  const w = x1 - x0; r = Math.min(r, h / 2, w);
+  return `M${x0},${y} H${x1 - r} Q${x1},${y} ${x1},${y + r} V${y + h - r} Q${x1},${y + h} ${x1 - r},${y + h} H${x0} Z`;
+}
+
+// Barras agrupadas verticales
+function groupedBars(id, { cats, series, unit, max, ticks, fmt = (v) => nf(v), label, desc }) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 56, r: 10, t: 40, b: 44 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const y = (v) => m.t + ih - (v / max) * ih;
+  ticks.forEach((t) => {
+    el('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: m.l - 10, y: y(t) + 5, 'text-anchor': 'end', class: 'muted' }, svg, fmt(t));
+  });
+  if (unit) el('text', { x: 0, y: m.t - 24, 'text-anchor': 'start', class: 'muted' }, svg, unit);
+  const gw = iw / cats.length, n = series.length;
+  const bw = Math.min(54, (gw * 0.7) / n);
+  cats.forEach((c, i) => {
+    const gx = m.l + gw * i + (gw - (bw * n + 2 * (n - 1))) / 2;
+    series.forEach((s, j) => {
+      const v = s.values[i]; if (v == null) return;
+      const x = gx + j * (bw + 2);
+      const g = el('g', { class: 'mk' }, svg);
+      el('path', { d: barPath(x, y(0), bw, y(Math.max(v, 0.0001))), fill: s.color(i) || s.color }, g);
+      const txt = label ? label(v, i, j) : fmt(v);
+      el('text', { x: x + bw / 2, y: y(v) - 8, 'text-anchor': 'middle', class: 'val' }, g, txt);
+      const hit = el('rect', { x: x - 2, y: m.t, width: bw + 4, height: ih, class: 'hit' }, svg);
+      bindTip(hit, `<b>${c} · ${s.name}</b>${txt}${unit ? ' ' + unit : ''}`, [g]);
+    });
+    el('text', { x: m.l + gw * i + gw / 2, y: H - m.b + 26, 'text-anchor': 'middle' }, svg, c);
+  });
+}
+
+// Líneas sobre escala logarítmica con marcas de falla
+function lineLog(id, { xs, series, threshold, desc }) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 70, r: 120, t: 20, b: 48 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const lo = Math.log10(10), hi = Math.log10(15000);
+  const y = (v) => m.t + ih - ((Math.log10(v) - lo) / (hi - lo)) * ih;
+  const x = (i) => m.l + (i / (xs.length - 1)) * iw;
+  [10, 100, 1000].forEach((t) => {
+    el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t), class: t === 10 ? 'axis' : 'grid' }, svg);
+    el('text', { x: m.l - 10, y: y(t) + 5, 'text-anchor': 'end', class: 'muted' }, svg, nf(t) + ' ms');
+  });
+  if (threshold) {
+    el('line', { x1: m.l, x2: m.l + iw, y1: y(threshold), y2: y(threshold), stroke: css('--bad'), 'stroke-width': 1.5, 'stroke-dasharray': '6 5' }, svg);
+    el('text', { x: m.l + iw + 8, y: y(threshold) + 5, fill: css('--bad'), style: 'fill:var(--bad);font-size:14px;font-weight:600' }, svg, 'límite 1 s');
+  }
+  xs.forEach((v, i) => el('text', { x: x(i), y: H - m.b + 26, 'text-anchor': 'middle' }, svg, v + ' req/s'));
+  const failY = y(10181);
+  el('text', { x: m.l - 10, y: failY + 5, 'text-anchor': 'end', class: 'muted' }, svg, 'falla');
+  const ends = [];
+  series.forEach((s, si) => {
+    const pts = s.values.map((v, i) => (v == null ? null : [x(i), y(v)]));
+    const ok = pts.filter((p, i) => p && !s.fail[i]);
+    if (s.ghost) {
+      if (ok.length > 1) el('polyline', { points: ok.map((p) => p.join(',')).join(' '), fill: 'none', stroke: css('--muted'), 'stroke-width': 1.5, 'stroke-dasharray': '5 5', opacity: 0.8 }, svg);
+      return;
+    }
+    const g = el('g', { class: 'mk' }, svg);
+    const warn = s.warn || [];
+    const solid = pts.filter((p, i) => p && !s.fail[i] && !warn[i]);
+    if (solid.length > 1) el('polyline', { points: solid.map((p) => p.join(',')).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, g);
+    warn.forEach((w, i) => { if (w && pts[i] && pts[i - 1]) el('line', { x1: pts[i - 1][0], y1: pts[i - 1][1], x2: pts[i][0], y2: pts[i][1], stroke: s.color, 'stroke-width': 2.5, 'stroke-dasharray': '6 5' }, g); });
+    s.values.forEach((v, i) => {
+      if (v == null) return;
+      const off = (si - 1) * 14;
+      if (s.fail[i]) {
+        const cx = x(i) + off, cy = failY;
+        el('path', { d: `M${cx - 7},${cy - 7} L${cx + 7},${cy + 7} M${cx + 7},${cy - 7} L${cx - 7},${cy + 7}`, stroke: s.color, 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+        const hit = el('circle', { cx, cy, r: 14, class: 'hit' }, svg);
+        bindTip(hit, `<b>${s.name} · ${xs[i]} req/s</b>${s.note && s.note[i] ? s.note[i] : 'El escalón falla'}`, [g]);
+      } else {
+        if (warn[i]) {
+          el('circle', { cx: x(i), cy: y(v), r: 6, fill: css('--surface'), stroke: s.color, 'stroke-width': 2.5 }, g);
+          el('text', { x: x(i) + 12, y: y(v) + 26, 'text-anchor': 'start', class: 'muted' }, g, warn[i]);
+        } else el('circle', { cx: x(i), cy: y(v), r: 5.5, fill: s.color, stroke: css('--surface'), 'stroke-width': 2 }, g);
+        const hit = el('circle', { cx: x(i), cy: y(v), r: 14, class: 'hit' }, svg);
+        bindTip(hit, `<b>${s.name} · ${xs[i]} req/s</b>p95 ${nf(v)} ms${s.note && s.note[i] ? '<br>' + s.note[i] : ''}`, [g]);
+      }
+    });
+    const last = ok[ok.length - 1];
+    if (last) ends.push({ y: last[1], x: last[0], name: s.name, g });
+  });
+  ends.sort((a, b) => a.y - b.y);
+  for (let k = 1; k < ends.length; k++) if (ends[k].y - ends[k - 1].y < 20) ends[k].y = ends[k - 1].y + 20;
+  ends.forEach((e) => el('text', { x: e.x + 12, y: e.y + 5, class: 'val' }, e.g, e.name));
+}
+
+// Barras horizontales con fondo de capacidad
+function capacityBars(id, rows, desc) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 170, r: 90, t: 20, b: 36 };
+  const iw = W - m.l - m.r;
+  const rh = Math.min(46, (H - m.t - m.b) / rows.length - 22);
+  const x = (v) => m.l + (v / 100) * iw;
+  [0, 25, 50, 75, 100].forEach((t) => {
+    el('line', { x1: x(t), x2: x(t), y1: m.t, y2: H - m.b, class: t === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: x(t), y: H - m.b + 22, 'text-anchor': 'middle', class: 'muted' }, svg, t + ' %');
+  });
+  rows.forEach((r, i) => {
+    const yy = m.t + 10 + i * (rh + 22);
+    el('text', { x: m.l - 14, y: yy + rh / 2 + 6, 'text-anchor': 'end', style: 'font-size:17px;fill:var(--ink)' }, svg, r.name);
+    const g = el('g', { class: 'mk' }, svg);
+    const w = Math.max(r.value, 0.6);
+    el('path', { d: hbarPath(x(0), yy, x(w), rh), fill: r.color }, g);
+    el('text', { x: x(w) + 10, y: yy + rh / 2 + 6, class: 'val' }, g, r.label);
+    const hit = el('rect', { x: m.l, y: yy - 4, width: iw, height: rh + 8, class: 'hit' }, svg);
+    bindTip(hit, `<b>${r.name}</b>${r.tip}`, [g]);
+  });
+}
+
+// Curva de rendimiento contra clientes (F3)
+function scaling(id, desc) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 56, r: 24, t: 30, b: 62 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const xs = [1, 2, 4, 8, 16];
+  const x = (n) => m.l + (Math.log2(n) / 4) * iw;
+  const y = (v) => m.t + ih - (v / 32) * ih;
+  [0, 10, 20, 30].forEach((t) => {
+    el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: m.l - 10, y: y(t) + 5, 'text-anchor': 'end', class: 'muted' }, svg, t);
+  });
+  el('text', { x: m.l - 10, y: m.t - 14, 'text-anchor': 'end', class: 'muted' }, svg, 'req/s');
+  xs.forEach((n) => el('text', { x: x(n), y: H - m.b + 26, 'text-anchor': 'middle' }, svg, n));
+  el('text', { x: m.l + iw / 2, y: H - 4, 'text-anchor': 'middle', class: 'muted' }, svg, 'clientes a la vez (cada uno pide de nuevo al recibir la respuesta)');
+  const data = [
+    { name: 'PC', color: css('--pc'), pts: [[1, 4.9], [2, 9.5], [4, 18.5], [8, 28.8], [16, 24.8]], tips: { 4: 'S = 3,78 · p = 0,981', 8: 'Máximo: los 8 hilos llenos (mongod 572 %, app 153 %)', 16: 'Sin hilos libres: los clientes extra solo esperan' } },
+    { name: 't3.small', color: css('--ec2'), pts: [[1, 5.7], [2, 9.1], [4, 10.2]], tips: { 2: 'El segundo hilo del mismo núcleo: +59 %', 4: 'Máximo 10,2 req/s: el núcleo está lleno' } },
+  ];
+  data.forEach((s) => {
+    const g = el('g', { class: 'mk' }, svg);
+    el('polyline', { points: s.pts.map(([n, v]) => `${x(n)},${y(v)}`).join(' '), fill: 'none', stroke: s.color, 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, g);
+    s.pts.forEach(([n, v]) => {
+      el('circle', { cx: x(n), cy: y(v), r: 5.5, fill: s.color, stroke: css('--surface'), 'stroke-width': 2 }, g);
+      const hit = el('circle', { cx: x(n), cy: y(v), r: 14, class: 'hit' }, svg);
+      bindTip(hit, `<b>${s.name} · ${n} cliente${n > 1 ? 's' : ''}</b>${nf(v, 1)} req/s${s.tips[n] ? '<br>' + s.tips[n] : ''}`, [g]);
+    });
+    const [ln, lv] = s.pts.reduce((a, b) => (b[1] > a[1] ? b : a));
+    el('text', { x: x(ln), y: y(lv) - 14, 'text-anchor': 'middle', class: 'val' }, g, `${s.name}: ${nf(lv, 1)}`);
+  });
+}
+
+// Codos medidos contra la escalera (escala logarítmica)
+function knees(id, desc) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 110, r: 30, t: 34, b: 58 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const lo = Math.log10(3.5), hi = Math.log10(110);
+  const x = (v) => m.l + ((Math.log10(v) - lo) / (hi - lo)) * iw;
+  const ladder = [5, 10, 20, 40, 80];
+  ladder.forEach((v) => {
+    el('line', { x1: x(v), x2: x(v), y1: m.t - 6, y2: m.t + ih, stroke: css('--accent'), 'stroke-width': 1.5, 'stroke-dasharray': '4 5', opacity: 0.7 }, svg);
+    el('text', { x: x(v), y: m.t + ih + 24, 'text-anchor': 'middle', class: 'val' }, svg, v);
+  });
+  el('line', { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, class: 'axis' }, svg);
+  el('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', class: 'muted' }, svg, 'req/s, escala logarítmica; las líneas son los escalones de la carga sostenida');
+  const rows = [
+    { name: 'PC', color: css('--pc'), pass: 35.8, fail: 42.9, xmax: 71 },
+    { name: 'Contenedor', color: css('--ct'), pass: 10.2, fail: 12.5, xmax: 20 },
+    { name: 't3.small', color: css('--ec2'), pass: 11.8, fail: 14.5, xmax: 23.3 },
+  ];
+  const rh = ih / rows.length;
+  rows.forEach((r, i) => {
+    const cy = m.t + rh * i + rh / 2;
+    el('text', { x: m.l - 16, y: cy + 6, 'text-anchor': 'end', style: 'font-size:17px;fill:var(--ink)' }, svg, r.name);
+    const g = el('g', { class: 'mk' }, svg);
+    const bh = 30;
+    el('rect', { x: x(r.pass), y: cy - bh / 2, width: Math.max(x(r.fail) - x(r.pass), 6), height: bh, rx: 4, fill: r.color, 'fill-opacity': 0.3, stroke: r.color, 'stroke-width': 2 }, g);
+    el('text', { x: (x(r.pass) + x(r.fail)) / 2, y: cy - bh / 2 - 8, 'text-anchor': 'middle', class: 'val', style: 'paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round' }, g, `codo ${nf(r.pass, 1)}–${nf(r.fail, 1)}`);
+    const dx = x(r.xmax), d = 8;
+    el('path', { d: `M${dx},${cy - d} L${dx + d},${cy} L${dx},${cy + d} L${dx - d},${cy} Z`, fill: css('--surface'), stroke: r.color, 'stroke-width': 2.5 }, g);
+    el('text', { x: dx, y: cy + bh / 2 + 18, 'text-anchor': 'middle', class: 'muted', style: 'paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round' }, g, `techo ${nf(r.xmax, r.xmax % 1 ? 1 : 0)}`);
+    const hit = el('rect', { x: m.l, y: cy - rh / 2, width: iw, height: rh, class: 'hit' }, svg);
+    bindTip(hit, `<b>${r.name}</b>Último nivel que pasa: ${nf(r.pass, 1)} req/s<br>Primero que falla: ${nf(r.fail, 1)} req/s<br>Techo predicho: ${nf(r.xmax, 1)} req/s`, [g]);
+  });
+}
+
+// Barras apiladas de costo
+function costBars(id, desc) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const rows = [
+    { name: 't3.small, original, 10 req/s', parts: [[16.78, '--ec2', 'Instancia + EBS'], [19.13, '--bad', 'Créditos de CPU']] },
+    { name: 't3.small, corregido, 40 req/s', parts: [[16.78, '--ec2', 'Instancia + EBS'], [0, '--bad', 'Créditos de CPU']] },
+    { name: 't3.small, corregido, 80 req/s', parts: [[16.78, '--ec2', 'Instancia + EBS'], [4.48, '--bad', 'Créditos de CPU']] },
+    { name: 'PC (estimado)', label: '39,84–41,39', parts: [[40.6, '--before', '39,84–41,39 USD: depreciación + energía, supuestos']] },
+    { name: 'Contenedor (2/12 del PC)', label: '6,64–6,92', parts: [[6.78, '--before', '6,64–6,92 USD: prorrateo de 2 de 12 hilos del PC']] },
+  ];
+  const m = { l: 260, r: 150, t: 14, b: 36 };
+  const iw = W - m.l - m.r;
+  const rh = Math.min(40, (H - m.t - m.b) / rows.length - 16);
+  const max = 40;
+  const x = (v) => m.l + (v / max) * iw;
+  [0, 10, 20, 30, 40].forEach((t) => {
+    el('line', { x1: x(t), x2: x(t), y1: m.t, y2: H - m.b, class: t === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: x(t), y: H - m.b + 22, 'text-anchor': 'middle', class: 'muted' }, svg, t + ' USD');
+  });
+  rows.forEach((r, i) => {
+    const yy = m.t + 8 + i * (rh + 16);
+    el('text', { x: m.l - 14, y: yy + rh / 2 + 6, 'text-anchor': 'end', style: 'font-size:16px;fill:var(--ink)' }, svg, r.name);
+    const g = el('g', { class: 'mk' }, svg);
+    let acc = 0; const total = r.parts.reduce((a, p) => a + p[0], 0);
+    r.parts.forEach(([v, c], k) => {
+      if (v <= 0) return;
+      const last = k === r.parts.length - 1 || r.parts.slice(k + 1).every((p) => p[0] <= 0);
+      const x0 = x(acc) + (acc > 0 ? 2 : 0), x1 = x(Math.min(acc + v, max));
+      if (last) el('path', { d: hbarPath(x0, yy, x1, rh), fill: css(c) }, g);
+      else el('rect', { x: x0, y: yy, width: x1 - x0, height: rh, fill: css(c) }, g);
+      acc += v;
+    });
+    el('text', { x: x(Math.min(total, max)) + 10, y: yy + rh / 2 + 6, class: 'val' }, g, (r.label || nf(total, 2)) + ' USD');
+    const hit = el('rect', { x: m.l, y: yy - 4, width: iw, height: rh + 8, class: 'hit' }, svg);
+    bindTip(hit, `<b>${r.name}</b>` + r.parts.filter((p) => p[0] > 0 || p[2].startsWith('Créd')).map((p) => `${p[2]}: ${nf(p[0], 2)} USD`).join('<br>') + (r.label ? '' : `<br>Total: ${nf(total, 2)} USD/mes`), [g]);
+  });
+}
+
+// Escalera de carga
+function stairs(id, desc) {
+  const { svg, W, H } = svgFor(id);
+  el('title', {}, svg, desc || '');
+  const m = { l: 56, r: 16, t: 26, b: 48 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const lv = [5, 10, 20, 40, 80];
+  const y = (v) => m.t + ih - (v / 90) * ih;
+  [0, 20, 40, 60, 80].forEach((t) => {
+    el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t), class: t === 0 ? 'axis' : 'grid' }, svg);
+    el('text', { x: m.l - 10, y: y(t) + 5, 'text-anchor': 'end', class: 'muted' }, svg, t);
+  });
+  el('text', { x: m.l - 10, y: m.t - 12, 'text-anchor': 'end', class: 'muted' }, svg, 'req/s');
+  const sw = iw / lv.length;
+  lv.forEach((v, i) => {
+    const g = el('g', { class: 'mk' }, svg);
+    const x0 = m.l + i * sw + 2;
+    el('path', { d: barPath(x0, y(0), sw - 4, y(v)), fill: css('--accent') }, g);
+    el('text', { x: x0 + (sw - 4) / 2, y: y(v) - 8, 'text-anchor': 'middle', class: 'val' }, g, v + ' req/s');
+    el('text', { x: x0 + (sw - 4) / 2, y: H - m.b + 22, 'text-anchor': 'middle', class: 'muted' }, svg, '10 min');
+    const hit = el('rect', { x: x0, y: m.t, width: sw - 4, height: ih, class: 'hit' }, svg);
+    bindTip(hit, `<b>Escalón ${i + 1}: ${v} req/s</b>${nf(v * 600)} peticiones en 10 min medidos<br>+30 s de calentamiento y 60 s de pausa`, [g]);
+  });
+  el('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle', class: 'muted' }, svg, 'tiempo → (unos 58 min por repetición, 93.000 peticiones)');
+}
+
+// ---------- datos y dibujo
+const drawn = new Set();
+function drawAll(force) {
+  if (force) drawn.clear();
+  const s = slides[cur];
+  s.querySelectorAll('.chart').forEach((c) => {
+    if (drawn.has(c.id) && !force) return;
+    drawn.add(c.id);
+    DRAW[c.id] && DRAW[c.id]();
+  });
+}
+const X = [5, 10, 20, 40, 80];
+const DRAW = {
+  'c-knee': () => knees('c-knee', 'Codo medido de cada máquina frente a los escalones de 5, 10, 20, 40 y 80 req/s'),
+  'c-p95-base': () => lineLog('c-p95-base', {
+    xs: X, threshold: 1000, desc: 'p95 por escalón con el código original',
+    series: [
+      { name: 'PC', color: css('--pc'), values: [245, 236, 255, 827, 1], fail: [0, 0, 0, 0, 1], warn: [0, 0, 0, 'pasa 2 de 3', 0], note: { 3: 'Pasa en 2 de 3 repeticiones (629 y 827 ms); falla en r3', 4: 'Falla en las tres repeticiones' } },
+      { name: 'Contenedor', color: css('--ct'), values: [245, 478, 1, null, null], fail: [0, 0, 1, 0, 0], note: { 2: 'Responde 1,1–1,4 req/s de 20; 89–95 % de errores' } },
+      { name: 't3.small', color: css('--ec2'), values: [276, 408, 1, null, null], fail: [0, 0, 1, 0, 0], note: { 2: 'Responde 1,8–2,2 req/s de 20; 88,9 % vence el tiempo límite' } },
+    ],
+  }),
+  'c-p95-fix': () => lineLog('c-p95-fix', {
+    xs: X, threshold: 1000, desc: 'p95 por escalón con el código corregido',
+    series: [
+      { name: 'PC original', ghost: true, values: [245, 236, 255, 827, null], fail: [0, 0, 0, 0, 0] },
+      { name: 'Contenedor original', ghost: true, values: [245, 478, null, null, null], fail: [0, 0, 0, 0, 0] },
+      { name: 't3.small original', ghost: true, values: [276, 408, null, null, null], fail: [0, 0, 0, 0, 0] },
+      { name: 'PC', color: css('--pc'), values: [22, 22, 21, 21, 20], fail: [0, 0, 0, 0, 0] },
+      { name: 'Contenedor', color: css('--ct'), values: [23, 22, 22, 21, 21], fail: [0, 0, 0, 0, 0] },
+      { name: 't3.small', color: css('--ec2'), values: [16, 13, 15, 14, 16], fail: [0, 0, 0, 0, 0] },
+    ],
+  }),
+  'c-where': () => capacityBars('c-where', [
+    { name: 'CPU', value: 48.2, label: '48,2 %', color: css('--accent'), tip: 'Promedio de las 2 vCPU en 10 min; pico 99,5 %' },
+    { name: 'Disco', value: 0.28, label: '0,28 %', color: css('--accent'), tip: '1 IOPS de 354 escrituras con fsync que mide fio<br>Espera de disco (wa): 0,0 %' },
+    { name: 'Red', value: 0.03, label: '0,03 %', color: css('--accent'), tip: '0,17 MB/s de salida contra 4.953 Mbit/s de iperf3' },
+    { name: 'Memoria', value: 23.6, label: '24 %', color: css('--accent'), tip: '449 de 1.905 MB (app + mongod)' },
+  ], 'Porcentaje de capacidad usada por recurso'),
+  'c-who': () => groupedBars('c-who', {
+    cats: ['PC', 'Contenedor', 't3.small'], max: 90, ticks: [0, 20, 40, 60, 80], unit: '% de un núcleo',
+    series: [
+      { name: 'Aplicación Java', color: () => css('--accent'), values: [27, 41, 34] },
+      { name: 'MongoDB', color: () => css('--ct'), values: [77, 56, 62] },
+    ],
+    label: (v) => nf(v) + ' %', desc: 'CPU de la aplicación y de MongoDB a 10 req/s',
+  }),
+  'c-amdahl': () => scaling('c-amdahl', 'Rendimiento del listado al aumentar los clientes simultáneos'),
+  'c-quota': () => groupedBars('c-quota', {
+    cats: ['app 1 · Mongo 1', 'app 4 · Mongo 1', 'app 1 · Mongo 2'], max: 30, ticks: [0, 10, 20, 30], unit: 'req/s',
+    series: [{ name: 'Máximo', color: (i) => (i === 2 ? css('--ct') : css('--before')), values: [18.0, 17.8, 26.9] }],
+    label: (v) => nf(v, 1) + ' req/s', fmt: (v) => nf(v), desc: 'Máximo del contenedor según el reparto de CPU',
+  }),
+  'c-fix-ms': () => groupedBars('c-fix-ms', {
+    cats: ['PC', 'Contenedor', 't3.small'], max: 250, ticks: [0, 50, 100, 150, 200, 250], unit: 'ms',
+    series: [
+      { name: 'Original', color: () => css('--before'), values: [220.3, 169.8, 167.4] },
+      { name: 'Corregido', color: () => css('--accent'), values: [7.2, 6.9, 7.1] },
+    ],
+    label: (v) => nf(v, 1), desc: 'CPU por listado antes y después del arreglo',
+  }),
+  'c-fix-max': () => groupedBars('c-fix-max', {
+    cats: ['PC', 'Contenedor', 't3.small'], max: 1400, ticks: [0, 350, 700, 1050, 1400], unit: 'req/s',
+    series: [
+      { name: 'Original', color: () => css('--before'), values: [71, 20, 23.3] },
+      { name: 'Corregido', color: () => css('--accent'), values: [1288.9, 262.3, 336.5] },
+    ],
+    label: (v) => nf(v, v % 1 ? 1 : 0), desc: 'Techo predicho antes y después del arreglo',
+  }),
+};
+// En los gráficos de líneas, el valor 1 en un nivel fallido solo marca la posición; se dibuja como ✕ en la fila "falla".
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => drawAll(true), 150); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => drawAll(true));
+fit();
+show(Math.max(0, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+addEventListener('beforeprint', () => { slides.forEach((s) => s.classList.add('on')); Object.keys(DRAW).forEach((k) => DRAW[k]()); });
+addEventListener('afterprint', () => show(cur));
+</script>
+</body>
+</html>
