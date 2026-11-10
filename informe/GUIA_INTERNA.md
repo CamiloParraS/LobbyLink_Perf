@@ -392,6 +392,17 @@ Corrieron en una t3.small Unlimited nueva con su generador aparte. Las dos insta
 
 **Qué significa.** El modelo solo mira CPU, así que no podía ver este fallo. La recomendación vale hasta pocos miles de lobbies. Antes de 20.000 hay que paginar el listado, y eso no lo medimos.
 
+**F7d en el PC y el contenedor (2026-11-10).** Mismo método, predicción escrita antes en `_logs/prediccion_datos_windows_20261110_003850.md` y `prediccion_datos_docker_20261110_011032.md`. Una repetición por tamaño.
+- 2.000 lobbies: pasan los dos. PC p95 45,4 ms, contenedor 42,0 ms, 0 errores.
+- 20.000 lobbies, PC: pasa con 0 errores y p95 335,7 ms. La app llegó a 1.938 MB residentes: la JVM ve 16 GB y toma un heap grande.
+- 20.000 lobbies, contenedor: falla el 100 % (5.990 timeouts). La predicción decía 27 % de CPU; la app usó 48 % de media. Fue memoria: heap por defecto de 247 MB, 1.782 Full GC y 178 líneas de `OutOfMemoryError`. Es el mismo fallo de la t3.small.
+- Qué decir: el modelo de CPU no ve la memoria. El fallo depende de cuánta RAM ve la JVM, no del procesador. Fijar `-Xmx` es obligatorio en un contenedor.
+- Cuidado: el reposo del PC salió en 11,6-12,3 % (límite 5 %) por otros programas.
+
+**F7 del contenedor con `-Xmx700m`.** Jar original. A 10 req/s p95 459,4 ms (con heap por defecto 424,7 ms). A 100 req/s sigue fallando el 100 % (p95 10.181 ms) y ya no hay `OutOfMemoryError`; la app usó 70 % de su núcleo y `mongod` 101 %. O sea: el heap pequeño era un riesgo, pero lo que tumba el código original a 100 req/s es la CPU de `mongod` por el N+1. No digan que el heap era la causa.
+
+**Frecuencia por hilo en el PC.** Con el contador nuevo, el login corre a 2.126 MHz (hilos de la app) y el listado a 2.768 MHz, con 3,5-3,7 GHz en los hilos 0 y 1. En el contenedor son 4,63 GHz. 4.630/2.126 = 2,18 contra 1,87 de razón de latencias del login (111,9 contra 59,8 ms). Se explica la mayor parte del doble costo de BCrypt en Windows; no sabemos por qué Windows mantiene el reloj bajo. Una sola corrida por endpoint. No hay contadores de IPC ni de caché (uProf no se corrió).
+
 **F9. ¿Cuándo empieza a importar el disco?** Cómo: sembramos lobbies directo en `mongod`, con ~3 KB de texto aleatorio cada uno, y pedimos lobbies al azar de 25 a 400 req/s. Una base de 20.000 (62 MB) cabe en la caché. Otra de 1.000.000 (3.117 MB) no cabe en 1,9 GiB de RAM.
 - Con la base que cabe, a 400 req/s: 0 % de fallos de caché, 1 IOPS, p95 28 ms.
 - Con la que no cabe, a 400 req/s: 12-14 % de fallos, 365 IOPS (el 12 % de lo que da el disco), `wa` 3,4 %, p95 121 ms y p99 1.089 ms. Todos los niveles pasan.
@@ -438,7 +449,7 @@ Se elige la t3.small Unlimited con el arreglo, a 16,78 USD/mes de infraestructur
 - **F6 del jar arreglado** tiene 2 repeticiones en el PC y en Docker, no 3.
 - **Versiones de software.** El PC usa MongoDB 9.0.4 y Java 25. El contenedor y la t3.small usan MongoDB 7.0.45 y Java 21.
 - **Microbenchmarks.** Corrieron en otra t3.small del mismo tipo, no en la de F1-F8. La cota del 2,9 % usa latencia de memoria y documentos examinados medidos, no fallos de caché de CPU. No digan "medimos los fallos de caché de la CPU".
-- **Predicción de datos ×10.** En F7 no quedó escrita antes de medir. F7d sí la tiene escrita antes, pero solo en la t3.small. En el PC y el contenedor sigue pendiente (paso p8 de `campanas/pendientes_local.sh`).
+- **Predicción de datos ×10.** En F7 no quedó escrita antes de medir. F7d sí la tiene escrita antes, en la t3.small, el PC y el contenedor (una repetición por tamaño). La utilización predicha en el PC con 20.000 lobbies fue 9 % y la medida unos 19 %: la predicción de CPU sale corta, pero acierta pasa/falla en el PC.
 - **F9 y F7d corrieron en otra t3.small** del mismo tipo, no en la de F1-F8, y solo con el jar arreglado. F9 pide un lobby a la vez: no digan que probamos el listado con datos que no caben.
 - **El p50 de 1,7 ms con `-Xmx1g`** no es una latencia buena: son conexiones rechazadas porque Java ya estaba muerto.
 - **Lo que viene de fichas y no de mediciones.** El precio de EBS (0,08 USD/GB-mes) es un ejemplo de la página de AWS. El TDP del Ryzen (35 W) es el de la ficha de AMD. Ninguno de los dos se midió.

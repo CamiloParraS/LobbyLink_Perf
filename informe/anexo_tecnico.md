@@ -672,6 +672,37 @@ Fuentes: `ec2_t3small-pend/_logs/prediccion_datos_ec2_20261109_170101.md`, `ec2_
 
 Con 2.000 lobbies la predicción acierta el resultado y se queda corta 5 puntos en la utilización, como en F5. Con 20.000 la predicción de CPU puede ser razonable, pero no importa, porque se acaba otro recurso. La JVM tomó por defecto un heap de 478 MB, un cuarto de la RAM. Con 2.000 lobbies cada listado pesa unos 340 KB de JSON (1,68 MB/s de salida entre unos 5 listados por segundo), así que con 20.000 serían unos 3,4 MB por respuesta, más los objetos que la JVM arma para producirla. `app.log` registra 95 pausas Full GC y 4 `OutOfMemoryError`. Uno de ellos mató el hilo `http-nio-8080-Poller` de Tomcat, el que acepta conexiones, y desde ahí fallaron también las peticiones de ver un lobby. Con `-Xmx1g` el heap deja de ser el tope, pero la máquina no tiene esa memoria: la app llegó a 949 MB residentes con `mongod` en unos 580 MB, y el kernel mató a Java. El modelo de capacidad solo mira CPU, así que no podía prever este fallo. La conclusión es que la t3.small vale mientras la base tenga pocos miles de lobbies abiertos, y antes de 20.000 hay que paginar `GET /api/lobbies`. No medimos esa paginación.
 
+**F7d en el PC y en el contenedor (2026-11-10).** Mismo script y jar arreglado, una repetición por tamaño, 600 s por nivel a 10 req/s con `mezcla-lectura`. Cada predicción se escribió antes de sembrar. Nota: el reposo del PC marcó 11,6 % y 12,3 % de CPU (límite 5 %) por otros programas; el contenedor tuvo reposo limpio (2,3 %).
+
+| Entorno y lobbies | Utilización predicha | Medido (media / máximo en la ventana) | p50 / p95 / p99 | Errores |
+| --- | --- | --- | --- | --- |
+| PC, 2.000 | 2 % | app 14/121 %, `mongod` 8/45 % de un núcleo | 23,3 / 45,4 / 49,1 ms | 0 |
+| PC, 20.000 | 9 % | app 112/520 %, `mongod` 43/275 %, RSS app 1.289/1.938 MB | 69,9 / 335,7 / 392,7 ms | 0 |
+| Contenedor 1×1, 2.000 | 9 % (app) | app 15/43 %, `mongod` 10/18 %, RSS app 260/262 MB | 23,3 / 42,0 / 49,1 ms | 0 |
+| Contenedor 1×1, 20.000 | 27 % (app) | app 48/134 %, `mongod` 5/30 %, RSS app 442/453 MB, frenado CFS máx. 7.041 ms | 10.181 (todo timeout) | 100 % (5.990 timeouts) |
+
+Fuentes: `_logs/prediccion_datos_windows_20261110_003850.md`, `_logs/prediccion_datos_docker_20261110_011032.md`, y las carpetas `20261110_053850_windows_v3fix-f7d-datos-2000`, `20261110_055215_windows_v3fix-f7d-datos-20000`, `20261110_061033_docker_v3fix-a1m1-f7d-datos-2000`, `20261110_062413_docker_v3fix-a1m1-f7d-datos-20000`.
+
+En el PC la predicción de utilización es de 8 CPU de capacidad; con 20.000 lobbies la CPU medida (app + `mongod` ≈ 155 % de un núcleo, 19 % de 8) fue el doble de lo predicho, el mismo sesgo hacia abajo que en F5. El resultado pasa/falla sí se acertó en el PC. En el contenedor la predicción de CPU no importó: `app.log` registra 1.782 pausas `Pause Full (Allocation Failure)` y 178 líneas `OutOfMemoryError: Java heap space`, con el heap en 247 MB (`247M->194M(247M)` al final). Es el mismo mecanismo de la t3.small: heap por defecto de un cuarto de la RAM visible. El PC pasa porque su JVM ve 16 GB.
+
+**F7 del contenedor con `-Xmx700m` (2026-11-10).** `20261110_051149_docker_v3xmx-a1m1-f7-trafico-x10`, jar original, `BASE_RPS=10`, contenedor de 1 GB y 1 CPU por proceso. Compara con `20261107_142802_docker_v3-a1m1-f7-trafico-x10` (heap por defecto, 256 MB).
+
+| Nivel | Heap por defecto (256 MB) | `-Xmx700m` |
+| --- | --- | --- |
+| 10 req/s | p95 424,7 ms, 0 errores | p95 459,4 ms (p50 75,6 / p99 764,9), 0 errores; app 43/84 %, `mongod` 57/149 % |
+| 100 req/s | p95 10.181 ms, 100 % de errores | p95 10.181 ms, 100 % de errores (timeouts 25.824, errores de conexión 33.973); app 70/99 %, `mongod` 101/196 %, RSS app 684/732 MB, frenado CFS máx. 3.367 ms |
+
+Con más heap no se evita la falla a 100 req/s, y no aparece `OutOfMemoryError` en `app.log`. La falla es de CPU: el código original con N+1 agota la cuota. El heap de 256 MB era un riesgo y explicaba el 19,5 % de tiempo en GC completo, pero no el tope.
+
+**Frecuencia por hilo en el PC (2026-11-10).** `20261110_045149_windows_v3frec-f1-login` y `20261110_050048_windows_v3frec-f1-list` (F1 de 360 s, jar original, 1 worker, tabla de `_logs/frecuencia_windows_f1_20261109.md`, frecuencia base informada 2.570 MHz).
+
+| F1 | Hilos de la app, MHz ponderados por ocupación | Hilos con mayor ocupación |
+| --- | --- | --- |
+| Login | 2.126 | hilos 3-7: 2.014-2.051 MHz con 19-27 % de ocupación |
+| Listado | 2.768 | hilos 0 y 1: 3.706 y 3.516 MHz; el hilo 9 (generador) 4.283 MHz |
+
+El login cae a ~2,0 GHz en los hilos que lo ejecutan, mientras el listado sube a 3,5-3,7 GHz en los hilos 0 y 1. Reloj en contenedor: 4,63 GHz (capítulo 7.2); 4.630 / 2.126 = 2,18 contra la razón de latencias del login 111,9 / 59,8 = 1,87. El reloj bajo explica la mayor parte del doble costo de BCrypt en Windows nativo; el resto (≈ 15 %) no lo explicamos. No medimos por qué Windows lo mantiene bajo.
+
 **F9.** Mide cuándo empieza a importar el disco. La carga pide un lobby al azar por su id, porque recorrer la base entera con el listado tardaría minutos por petición. La base que cabe tiene 20.000 lobbies (62 MB). La que no cabe tiene 1.000.000 (3.117 MB de datos y 12,8 MB de índices) contra 1,9 GiB de RAM y 440 MB de caché de WiredTiger.
 
 | 400 req/s | Cabe (20.000) | No cabe (1.000.000) |
@@ -739,7 +770,7 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - En el PC y el contenedor, el generador de carga corre en la misma máquina. Fijamos la afinidad (hilos 8 a 11 para el generador), pero comparte memoria, caché L3 y controlador de memoria con la app. En la t3.small el generador corre en otra instancia.
 - El PC usa Java 25 y MongoDB 9.0.4. El contenedor y la t3.small usan Java 21 y MongoDB 7.0.45. Comparamos el PC con el contenedor sabiendo que cambian el sistema y las versiones a la vez (capítulo 7.3).
 - Docker corre en la VM de WSL2, no en un Linux nativo. Su red virtual y sus llamadas al sistema cuestan más que en Linux sobre hardware propio (capítulo 7.2).
-- No medimos la frecuencia del Ryzen durante las pruebas. Sí la medimos aparte dentro del contenedor (4,63 GHz, capítulo 7.2). Para medirla durante las pruebas haría falta registrar el contador `% Processor Performance` de Windows mientras corre F1. Sin ese dato no sabemos si el doble costo del login en Windows nativo viene del reloj.
+- La frecuencia del Ryzen en Windows nativo la medimos en F1 de login y de listado el 2026-11-10 (capítulo 9.1): 2.126 MHz en login y 2.768 MHz en listado, contra 4,63 GHz dentro del contenedor (capítulo 7.2). Es una sola corrida por endpoint y no sabemos qué mantiene el reloj bajo en Windows. No medimos contadores de caché ni IPC (AMD uProf no se corrió).
 - Medimos un solo tipo de instancia de nube. La c7a.2xlarge solo tiene precio de ficha.
 
 **Medición.**
@@ -750,7 +781,7 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - Las corridas del contenedor anteriores al 2026-11-07 registraron la red en 0 por un error del agente. Repetimos un nivel de F6 de cada jar con el agente corregido.
 - No medimos la explicación de SMT y BCrypt con contadores de hardware (capítulo 4.3).
 - Las pendientes de créditos de la t3.small salen de 2 a 5 puntos de CloudWatch por nivel (capítulo 8.1).
-- La predicción de datos ×10 de F7 la extrapolamos después de medir (capítulo 9). F7d la repitió con la predicción escrita antes, pero por ahora solo en la t3.small (capítulo 9.1).
+- La predicción de datos ×10 de F7 la extrapolamos después de medir (capítulo 9). F7d la repitió con la predicción escrita antes en la t3.small, el PC y el contenedor (capítulo 9.1), con una repetición por tamaño. En el PC el reposo salió en 11,6-12,3 %, sobre el límite de 5 %.
 
 **Carga y datos.**
 
@@ -787,6 +818,7 @@ Todas las rutas son relativas a `lobbylink_perfv3/resultados/`. Cada corrida tie
 | 8, costos | `_aws_precios_20261107/precios.md`, `_aws_costos_20261106/`, `_aws_costos_20261107/costos_consola.md`, `_logs/creditos_ec2_unl_20261107.md` |
 | 9, F7 | `_logs/prediccion_x10_*.md`, carpetas `*_f7-*`, `ec2_t3small-unl*/f7-*`, `ec2_t3small-unl*/_logs/prediccion_x10_ec2_*.md` |
 | 5 y 8.1, F8 | `ec2_t3small-unl/f8-largo`, `ec2_t3small-unl-nplus1/f8-largo` y las carpetas `f8*` de `ec2_t3small-std*` |
+| 9.1, F7d en PC y contenedor, F7 `-Xmx700m`, frecuencia por hilo | `20261110_*_windows_v3fix-f7d-datos-*`, `20261110_*_docker_v3fix-a1m1-f7d-datos-*`, `20261110_051149_docker_v3xmx-a1m1-f7-trafico-x10`, `20261110_*_windows_v3frec-f1-*`, `_logs/prediccion_datos_windows_20261110_003850.md`, `_logs/prediccion_datos_docker_20261110_011032.md`, `_logs/frecuencia_windows_f1_20261109.md` |
 | 9.1, F7d y F9 | `ec2_t3small-pend/` (`f7d-datos-2000`, `f7d-datos-20000`, `f9-caliente`, `f9-frio`, `_logs/prediccion_datos_ec2_20261109_170101.md`), `ec2_t3small-xmx/f7d-datos-20000` |
 | 12, equivalencia | `_equivalencia_20261109_ec2/` |
 
