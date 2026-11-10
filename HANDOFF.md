@@ -172,3 +172,16 @@ Unas 2 h 10. Estado en `resultados/_logs/_pendientes_estado.txt`. Lo opcional (`
 2. Regenerar el dashboard: `node dashboard/build.mjs`.
 3. Revisar el largo del informe (6-10 páginas) y preparar la sustentación de 7 min.
 4. `git push` cuando el usuario lo pida.
+
+## 12. Estado al 2026-11-10 (pruebas del PC hechas)
+
+`SOLO="p3 p2 p4 p8"` terminó a las 01:44 con los cuatro pasos en código 0 (`resultados/_logs/_pendientes_estado.txt`). No se corrió lo opcional (p9 p7 p5 p6) ni AMD uProf.
+
+- **p3:** 95 respuestas idénticas entre jars en el PC.
+- **p2:** frecuencia por hilo, `20261110_045149_windows_v3frec-f1-login` (2.126 MHz ponderados en los hilos de la app) y `20261110_050048_windows_v3frec-f1-list` (2.768 MHz); tabla en `_logs/frecuencia_windows_f1_20261109.md`.
+- **p4:** F7 del contenedor con `-Xmx700m`, `20261110_051149_docker_v3xmx-a1m1-f7-trafico-x10`: 10 req/s p95 459,4 ms; 100 req/s sigue con 100 % de errores y sin `OutOfMemoryError`. El heap no era la causa de la falla.
+- **p8:** F7d en PC y contenedor. 2.000 lobbies pasan en los dos (p95 45,4 y 42,0 ms). 20.000: el PC pasa (p95 335,7 ms, RSS app 1.938 MB); el contenedor falla el 100 % por memoria (heap 247 MB, 1.782 Full GC, 178 `OutOfMemoryError`).
+- Reposo del PC en F7d: 11,6 % y 12,3 % (límite 5 %); está anotado en el anexo.
+- Documentos actualizados: `informe/informe.md`, `informe/anexo_tecnico.md` (cap. 9.1) y `informe/GUIA_INTERNA.md`. Dashboard regenerado. Sin `git commit` ni `push`.
+
+Pendiente: revisar el largo del informe (6-10 páginas), preparar la sustentación y, si sobra tiempo, `SOLO="p9 p7"` y uProf (`setup/UPROF.md`). `git push` solo cuando el usuario lo pida.
