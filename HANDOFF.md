@@ -175,7 +175,7 @@ Unas 2 h 10. Estado en `resultados/_logs/_pendientes_estado.txt`. Lo opcional (`
 
 ## 12. Estado al 2026-11-10 (pruebas del PC hechas)
 
-`SOLO="p3 p2 p4 p8"` terminó a las 01:44 con los cuatro pasos en código 0 (`resultados/_logs/_pendientes_estado.txt`). No se corrió lo opcional (p9 p7 p5 p6) ni AMD uProf.
+`SOLO="p3 p2 p4 p8"` terminó a las 01:44 con los cuatro pasos en código 0 (`resultados/_logs/_pendientes_estado.txt`). No se corrió lo opcional (p9 p7 p5 p6). AMD uProf se corrió después (ver abajo).
 
 - **p3:** 95 respuestas idénticas entre jars en el PC.
 - **p2:** frecuencia por hilo, `20261110_045149_windows_v3frec-f1-login` (2.126 MHz ponderados en los hilos de la app) y `20261110_050048_windows_v3frec-f1-list` (2.768 MHz); tabla en `_logs/frecuencia_windows_f1_20261109.md`.
@@ -184,4 +184,6 @@ Unas 2 h 10. Estado en `resultados/_logs/_pendientes_estado.txt`. Lo opcional (`
 - Reposo del PC en F7d: 11,6 % y 12,3 % (límite 5 %); está anotado en el anexo.
 - Documentos actualizados: `informe/informe.md`, `informe/anexo_tecnico.md` (cap. 9.1) y `informe/GUIA_INTERNA.md`. Dashboard regenerado. Sin `git commit` ni `push`.
 
-Pendiente: revisar el largo del informe (6-10 páginas), preparar la sustentación y, si sobra tiempo, `SOLO="p9 p7"` y uProf (`setup/UPROF.md`). `git push` solo cuando el usuario lo pida.
+**uProf (2026-11-10, 23:03-23:12).** `setup/uprof.ps1` terminó los tres casos TBP (`login-1w`, `login-2w`, `list-1w`) en `resultados/_uprof_20261110_2303/`, sin errores y sin caída del PC (no hay eventos 41/6008 ni minidump; los reinicios posteriores fueron de Windows Update). Solo modo TBP: el reporte dice `Hypervisor Vendor: Microsoft Hyper-V`, así que no hay IPC ni fallos de caché. Resultado útil: listado, `ntoskrnl.exe` 69,4 % de las muestras atribuidas. Documentado en anexo 9.1 y 12, informe, guía y presentación. Para IPC real habría que arrancar Windows con `HypervisorPresent = False` (probablemente hay que apagar también VBS/integridad de memoria) y usar `--config cpi`.
+
+Pendiente: revisar el largo del informe (6-10 páginas), preparar la sustentación y, si sobra tiempo, `SOLO="p9 p7"`. `git push` solo cuando el usuario lo pida.

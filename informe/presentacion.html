@@ -571,12 +571,12 @@ table.t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
       <ul>
         <li>La paginación, que sería el siguiente arreglo.</li>
         <li>Tráfico real: la mezcla sale de la colección Postman.</li>
-        <li>Contadores de hardware: las explicaciones de caché y SMT salen de microbenchmarks.</li>
+        <li>Contadores de hardware: uProf corrió, pero Windows va sobre Hyper-V y solo dejó el muestreo por tiempo. Sin IPC ni fallos de caché; caché y SMT salen de microbenchmarks.</li>
         <li>En el PC, el generador de carga corre en la misma máquina.</li>
       </ul>
     </div>
   </div>
-  <aside class="notes">El arreglo no resolvió todo: el listado sigue sin paginación y el login sigue caro. No medimos tráfico real ni contadores de hardware. Todo está en el anexo con sus carpetas. Gracias.</aside>
+  <aside class="notes">El arreglo no resolvió todo: el listado sigue sin paginación y el login sigue caro. No medimos tráfico real ni contadores de hardware: corrimos AMD uProf, pero con Windows sobre el hipervisor solo funcionó el modo por tiempo. Lo que sí vimos es que en el listado el núcleo de Windows se lleva el 69 % de las muestras, coherente con el N+1. Todo está en el anexo con sus carpetas. Gracias.</aside>
 </section>
 
 <!-- 17 -->

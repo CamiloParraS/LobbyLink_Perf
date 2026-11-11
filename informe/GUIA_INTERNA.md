@@ -401,7 +401,7 @@ Corrieron en una t3.small Unlimited nueva con su generador aparte. Las dos insta
 
 **F7 del contenedor con `-Xmx700m`.** Jar original. A 10 req/s p95 459,4 ms (con heap por defecto 424,7 ms). A 100 req/s sigue fallando el 100 % (p95 10.181 ms) y ya no hay `OutOfMemoryError`; la app usó 70 % de su núcleo y `mongod` 101 %. O sea: el heap pequeño era un riesgo, pero lo que tumba el código original a 100 req/s es la CPU de `mongod` por el N+1. No digan que el heap era la causa.
 
-**Frecuencia por hilo en el PC.** Con el contador nuevo, el login corre a 2.126 MHz (hilos de la app) y el listado a 2.768 MHz, con 3,5-3,7 GHz en los hilos 0 y 1. En el contenedor son 4,63 GHz. 4.630/2.126 = 2,18 contra 1,87 de razón de latencias del login (111,9 contra 59,8 ms). Se explica la mayor parte del doble costo de BCrypt en Windows; no sabemos por qué Windows mantiene el reloj bajo. Una sola corrida por endpoint. No hay contadores de IPC ni de caché (uProf no se corrió).
+**Frecuencia por hilo en el PC.** Con el contador nuevo, el login corre a 2.126 MHz (hilos de la app) y el listado a 2.768 MHz, con 3,5-3,7 GHz en los hilos 0 y 1. En el contenedor son 4,63 GHz. 4.630/2.126 = 2,18 contra 1,87 de razón de latencias del login (111,9 contra 59,8 ms). Se explica la mayor parte del doble costo de BCrypt en Windows; no sabemos por qué Windows mantiene el reloj bajo. Una sola corrida por endpoint. No hay contadores de IPC ni de caché: uProf sí se corrió el 2026-11-10, pero con Windows sobre Hyper-V solo funcionó el modo por tiempo (TBP). Si preguntan, el reporte dice `Virtual Machine: Yes`, `Hypervisor Vendor: Microsoft Hyper-V`. En el listado, `ntoskrnl.exe` tiene el 69,4 % de las muestras atribuidas (6,109 de 8,804 s); en el login, 24 %. Ver anexo 9.1.
 
 **F9. ¿Cuándo empieza a importar el disco?** Cómo: sembramos lobbies directo en `mongod`, con ~3 KB de texto aleatorio cada uno, y pedimos lobbies al azar de 25 a 400 req/s. Una base de 20.000 (62 MB) cabe en la caché. Otra de 1.000.000 (3.117 MB) no cabe en 1,9 GiB de RAM.
 - Con la base que cabe, a 400 req/s: 0 % de fallos de caché, 1 IOPS, p95 28 ms.
@@ -412,7 +412,7 @@ Corrieron en una t3.small Unlimited nueva con su generador aparte. Las dos insta
 
 **Equivalencia del arreglo.** `telemetry/comparar_respuestas.mjs` arrancó los dos jars sobre la misma base y comparó 95 respuestas: listados, listados por videojuego y 45 detalles con 0 a 5 cupos libres. Las 95 fueron idénticas (`resultados/_equivalencia_20261109_ec2/`). Sirve para responder "¿cómo saben que el arreglo no cambió lo que responde la API?".
 
-**Límites.** No medimos los fallos de caché de la CPU ni la frecuencia del Ryzen. Los microbenchmarks no corrieron en la misma instancia de F1-F8. Las explicaciones de SMT y del login lento en Windows son hipótesis coherentes con los datos, no mediciones directas.
+**Límites.** No medimos los fallos de caché de la CPU (uProf corrió solo en modo TBP por el hipervisor). La frecuencia del Ryzen sí se midió (2.126 y 2.768 MHz). Los microbenchmarks no corrieron en la misma instancia de F1-F8. Las explicaciones de SMT y del login lento en Windows son hipótesis coherentes con los datos, no mediciones directas.
 
 ## Parte 4. Las cuatro preguntas de la sustentación
 
@@ -535,7 +535,7 @@ Por la misma fórmula. Con el arreglo una petición cuesta ~7 ms, así que aun m
 Por el N+1: unas 206 `find` y 200 conteos por listado. Cada consulta se analiza, se planifica y recorre documentos dentro de `mongod`, que en la t3.small usa 62 % de un núcleo contra 34 % de la app.
 
 **¿Y la caché del procesador? ¿No espera a la memoria?**
-Con el microbenchmark medimos RAM a 101-118 ns por acceso. Aunque cada uno de los ~40.800 documentos que examina un listado fuera un fallo a RAM, serían 4,8 ms de 167,4 ms, un 2,9 %. No medimos fallos de caché con contadores de hardware, y así hay que decirlo.
+Con el microbenchmark medimos RAM a 101-118 ns por acceso. Aunque cada uno de los ~40.800 documentos que examina un listado fuera un fallo a RAM, serían 4,8 ms de 167,4 ms, un 2,9 %. No medimos fallos de caché con contadores de hardware, y así hay que decirlo: uProf corrió, pero sin acceso a los contadores por el hipervisor.
 
 **¿40.800 o 20.412 documentos?**
 Las dos cifras están bien. Un listado examina unos 40.800 documentos. La mezcla es mitad listar y mitad ver, así que por petición promedio son ~20.412.

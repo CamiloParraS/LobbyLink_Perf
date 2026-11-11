@@ -199,7 +199,7 @@ Pasar de la t3.small al PC multiplica por 3 el techo del código original; corre
 
 - Las mezclas salen de la colección Postman, no de uso real.
 - En el PC y el contenedor el generador corre en el mismo equipo, Docker corre sobre WSL2 y las versiones de MongoDB y Java difieren entre el PC y las otras dos opciones.
-- Las explicaciones de SMT, frecuencia y memoria salen de microbenchmarks y del contador de frecuencia de Windows, no de contadores de hardware.
+- Las explicaciones de SMT, frecuencia y memoria salen de microbenchmarks y del contador de frecuencia de Windows, no de contadores de hardware. Corrimos AMD uProf (2026-11-10), pero Windows corre sobre el hipervisor de Microsoft y solo dejó el muestreo por tiempo: sin IPC ni fallos de caché. Lo único que aportó es que en el listado el núcleo de Windows se lleva el 69,4 % de las muestras atribuidas (6,109 de 8,804 s), coherente con el N+1.
 - La carga sostenida con el código corregido tiene 2 repeticiones en el PC y el contenedor, y la de datos por diez y por cien una por tamaño. El resto de cautelas está en el capítulo 12 del anexo.
 
 ## Datos crudos y guiones

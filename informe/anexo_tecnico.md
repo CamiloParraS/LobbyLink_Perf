@@ -703,6 +703,16 @@ Con más heap no se evita la falla a 100 req/s, y no aparece `OutOfMemoryError` 
 
 El login cae a ~2,0 GHz en los hilos que lo ejecutan, mientras el listado sube a 3,5-3,7 GHz en los hilos 0 y 1. Reloj en contenedor: 4,63 GHz (capítulo 7.2); 4.630 / 2.126 = 2,18 contra la razón de latencias del login 111,9 / 59,8 = 1,87. El reloj bajo explica la mayor parte del doble costo de BCrypt en Windows nativo; el resto (≈ 15 %) no lo explicamos. No medimos por qué Windows lo mantiene bajo.
 
+**AMD uProf (2026-11-10, `_uprof_20261110_2303/`).** Corrimos uProf 6.0.1520.0 sobre el proceso de Java con el jar original, 60 s por caso, tras 30 s de calentamiento. Solo pudo usar el modo de muestreo por tiempo (TBP). El reporte dice `Virtual Machine: Yes` y `Hypervisor Vendor: Microsoft Hyper-V`, y el script detectó `HypervisorPresent = True` aunque `hypervisorlaunchtype` estaba en `Off`. Con Windows sobre un hipervisor no hay contadores de hardware, así que **no obtuvimos IPC ni fallos de L1, L2 o L3**. La explicación de SMT y de caché sigue sin contadores.
+
+| Caso | CPU atribuida a la app | Módulo mayor | Segundo | Tercero |
+| --- | --- | --- | --- | --- |
+| Login, 1 cliente | 3,30 s | `jvm.dll` 1,904 s (57,7 %) | `ntoskrnl.exe` 0,805 s (24,4 %) | `ntdll.dll` 0,398 s (12,1 %) |
+| Login, 2 clientes | 4,07 s | `jvm.dll` 2,716 s (66,7 %) | `ntoskrnl.exe` 0,968 s (23,8 %) | `ntdll.dll` 0,181 s (4,4 %) |
+| Listado, 1 cliente | 8,80 s | `ntoskrnl.exe` 6,109 s (69,4 %) | `jvm.dll` 1,208 s (13,7 %) | `ntdll.dll` 0,589 s (6,7 %); `afd.sys` 0,273 s (3,1 %) |
+
+Lo que sí dice: en el listado el núcleo de Windows se lleva el 69,4 % de las muestras atribuidas y una sola dirección de `ntoskrnl.exe` (`0x140392bd0`) suma 4,18 s, el 47,5 %; `afd.sys` es el controlador de sockets. Es coherente con el N+1: cada listado hace cientos de consultas pequeñas a `mongod` por loopback. En el login el núcleo pesa 24 % y no cambia entre 1 y 2 clientes (24,4 y 23,8 %). Lo que no dice: el reporte atribuye 3,3 a 8,8 s de los 60 s colectados, y no vemos el código Java compilado por el JIT (donde corre BCrypt), así que no sirve para medir el reparto entre BCrypt y el resto. Las direcciones de `ntoskrnl.exe` no tienen símbolos, por lo que "sockets" es una hipótesis. Se hizo una colección por caso.
+
 **F9.** Mide cuándo empieza a importar el disco. La carga pide un lobby al azar por su id, porque recorrer la base entera con el listado tardaría minutos por petición. La base que cabe tiene 20.000 lobbies (62 MB). La que no cabe tiene 1.000.000 (3.117 MB de datos y 12,8 MB de índices) contra 1,9 GiB de RAM y 440 MB de caché de WiredTiger.
 
 | 400 req/s | Cabe (20.000) | No cabe (1.000.000) |
@@ -770,7 +780,7 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - En el PC y el contenedor, el generador de carga corre en la misma máquina. Fijamos la afinidad (hilos 8 a 11 para el generador), pero comparte memoria, caché L3 y controlador de memoria con la app. En la t3.small el generador corre en otra instancia.
 - El PC usa Java 25 y MongoDB 9.0.4. El contenedor y la t3.small usan Java 21 y MongoDB 7.0.45. Comparamos el PC con el contenedor sabiendo que cambian el sistema y las versiones a la vez (capítulo 7.3).
 - Docker corre en la VM de WSL2, no en un Linux nativo. Su red virtual y sus llamadas al sistema cuestan más que en Linux sobre hardware propio (capítulo 7.2).
-- La frecuencia del Ryzen en Windows nativo la medimos en F1 de login y de listado el 2026-11-10 (capítulo 9.1): 2.126 MHz en login y 2.768 MHz en listado, contra 4,63 GHz dentro del contenedor (capítulo 7.2). Es una sola corrida por endpoint y no sabemos qué mantiene el reloj bajo en Windows. No medimos contadores de caché ni IPC (AMD uProf no se corrió).
+- La frecuencia del Ryzen en Windows nativo la medimos en F1 de login y de listado el 2026-11-10 (capítulo 9.1): 2.126 MHz en login y 2.768 MHz en listado, contra 4,63 GHz dentro del contenedor (capítulo 7.2). Es una sola corrida por endpoint y no sabemos qué mantiene el reloj bajo en Windows. Corrimos AMD uProf, pero Windows está sobre el hipervisor de Microsoft y solo dejó el modo por tiempo: no hay contadores de caché ni IPC (capítulo 9.1).
 - Medimos un solo tipo de instancia de nube. La c7a.2xlarge solo tiene precio de ficha.
 
 **Medición.**
@@ -779,7 +789,7 @@ Estas son las condiciones que pueden cambiar algún número del informe y cómo 
 - Las tres corridas de la prueba de JVM del capítulo 7.3 tuvieron el reposo sucio (15,5-16 %) y `mongod` sin fijar.
 - F6 con el jar arreglado tiene 2 repeticiones en el PC y el contenedor, y 3 en las demás.
 - Las corridas del contenedor anteriores al 2026-11-07 registraron la red en 0 por un error del agente. Repetimos un nivel de F6 de cada jar con el agente corregido.
-- No medimos la explicación de SMT y BCrypt con contadores de hardware (capítulo 4.3).
+- No medimos la explicación de SMT y BCrypt con contadores de hardware (capítulo 4.3). uProf corrió el 2026-11-10 en modo TBP porque el hipervisor estaba presente; falta una prueba con Windows sin hipervisor (apagar Hyper-V/VBS y reiniciar, y comprobar que `HypervisorPresent` sea `False`) para obtener IPC y fallos de caché.
 - Las pendientes de créditos de la t3.small salen de 2 a 5 puntos de CloudWatch por nivel (capítulo 8.1).
 - La predicción de datos ×10 de F7 la extrapolamos después de medir (capítulo 9). F7d la repitió con la predicción escrita antes en la t3.small, el PC y el contenedor (capítulo 9.1), con una repetición por tamaño. En el PC el reposo salió en 11,6-12,3 %, sobre el límite de 5 %.
 
@@ -820,6 +830,7 @@ Todas las rutas son relativas a `lobbylink_perfv3/resultados/`. Cada corrida tie
 | 5 y 8.1, F8 | `ec2_t3small-unl/f8-largo`, `ec2_t3small-unl-nplus1/f8-largo` y las carpetas `f8*` de `ec2_t3small-std*` |
 | 9.1, F7d en PC y contenedor, F7 `-Xmx700m`, frecuencia por hilo | `20261110_*_windows_v3fix-f7d-datos-*`, `20261110_*_docker_v3fix-a1m1-f7d-datos-*`, `20261110_051149_docker_v3xmx-a1m1-f7-trafico-x10`, `20261110_*_windows_v3frec-f1-*`, `_logs/prediccion_datos_windows_20261110_003850.md`, `_logs/prediccion_datos_docker_20261110_011032.md`, `_logs/frecuencia_windows_f1_20261109.md` |
 | 9.1, F7d y F9 | `ec2_t3small-pend/` (`f7d-datos-2000`, `f7d-datos-20000`, `f9-caliente`, `f9-frio`, `_logs/prediccion_datos_ec2_20261109_170101.md`), `ec2_t3small-xmx/f7d-datos-20000` |
+| 9.1, uProf | `_uprof_20261110_2303/` (`login-1w-tbp`, `login-2w-tbp`, `list-1w-tbp`; cada una con `report.csv`, `_collect.log`, `_run.log`); corrida previa de un caso en `_uprof_20261110_2246/`; script `setup/uprof.ps1` |
 | 12, equivalencia | `_equivalencia_20261109_ec2/` |
 
 ### B. Comandos para reproducir
