@@ -1,6 +1,6 @@
 # Guía interna: glosario y mediciones explicadas en simple
 
-Documento de estudio para el equipo. No se entrega. Sirve para preparar la sustentación y para entender el informe (`informe.md`) sin tener que leer el código. Cada cifra tiene al lado la carpeta de `resultados/` de donde sale, por si hay que mostrarla.
+Documento de estudio para el equipo. No se entrega. Sirve para preparar la sustentación y para entender el informe (`informe.md`) sin tener que leer el código. Cada cifra tiene al lado la carpeta de `resultados/` de donde sale, por si hay que mostrarla. Para la sustentación, empiecen por la Parte 6 (la presentación), la Parte 7 (banco de preguntas) y la Parte 8 (cómo prepararse).
 
 ## Parte 1. La idea en cinco frases
 
@@ -417,7 +417,7 @@ Corrieron en una t3.small Unlimited nueva con su generador aparte. Las dos insta
 ## Parte 4. Las cuatro preguntas de la sustentación
 
 **¿Por qué ese número y no otro? ¿Cómo lo midieron?**
-Todo nivel de carga sale de una medición. F1 dice cuánto cuesta una petición, de ahí sale el techo, y la rampa y el ×10 se construyen sobre ese techo. La escala de F6 (5 a 80) es la misma en todas las máquinas para poder compararlas. Hay dos números elegidos y los dos se declaran como tales. Uno es el requisito de 1.000 ms. Con 300 o 500 ms la recomendación (el arreglo en la t3.small) no cambia, porque con el jar arreglado ningún nivel cambia de resultado. Lo que sí cambia es cuánto aguanta el jar base: con 300 ms la t3 y el contenedor pasarían solo 5 req/s, y con 500 ms el PC solo 20. El otro es el tamaño de datos de 200 lobbies, que viene de nuestras mediciones anteriores, y mostramos que con 100 a 2.000 lobbies la conclusión tampoco cambia. Todo tiene guion y semilla, y se puede repetir.
+Todo nivel de carga sale de una medición. F1 dice cuánto cuesta una petición, de ahí sale el techo, y la rampa y el ×10 se construyen sobre ese techo. La escala de F6 (5 a 80) duplica en cada escalón y es la misma en todas las máquinas para poder compararlas: la fijamos sobre los codos de nuestra primera medición, y la rampa (F5) confirmó que los encierra. No digan que es un número de usuarios. Hay dos números elegidos y los dos se declaran como tales. Uno es el requisito de 1.000 ms. Con 300 o 500 ms la recomendación (el arreglo en la t3.small) no cambia, porque con el jar arreglado ningún nivel cambia de resultado. Lo que sí cambia es cuánto aguanta el jar base: con 300 ms la t3 y el contenedor pasarían solo 5 req/s, y con 500 ms el PC solo 20. El otro es el tamaño de datos de 200 lobbies, que viene de nuestras mediciones anteriores, y mostramos que con 100 a 2.000 lobbies la conclusión tampoco cambia. Todo tiene guion y semilla, y se puede repetir.
 
 **¿Y por qué 200 lobbies?** (la van a hacer)
 "No sale de una medición. Es un tamaño de referencia que traíamos de las versiones anteriores, para que todas las corridas sean comparables. Como no sabemos cuántos lobbies tendría la aplicación en uso real, lo medimos como variable: el listado con 100, 200, 400, 800 y 1.600 lobbies (F2) y carga sostenida con 2.000 (F7). En todos los tamaños gana la misma opción. Con el código original, la t3.small pasa de sostener 27,9 req/s con 100 lobbies a 1,0 con 1.600. Con el arreglo sostiene 70,4 req/s incluso con 1.600." Si piden el detalle, la tabla está en la sección 4.2 del informe y en `resultados/_logs/sensibilidad_lobbies_20261107.md`.
@@ -452,4 +452,183 @@ Se elige la t3.small Unlimited con el arreglo, a 16,78 USD/mes de infraestructur
 - **Predicción de datos ×10.** En F7 no quedó escrita antes de medir. F7d sí la tiene escrita antes, en la t3.small, el PC y el contenedor (una repetición por tamaño). La utilización predicha en el PC con 20.000 lobbies fue 9 % y la medida unos 19 %: la predicción de CPU sale corta, pero acierta pasa/falla en el PC.
 - **F9 y F7d corrieron en otra t3.small** del mismo tipo, no en la de F1-F8, y solo con el jar arreglado. F9 pide un lobby a la vez: no digan que probamos el listado con datos que no caben.
 - **El p50 de 1,7 ms con `-Xmx1g`** no es una latencia buena: son conexiones rechazadas porque Java ya estaba muerto.
+- **El "21 USD/mes" es solo máquina y disco.** Con salida a internet, a 80 req/s son 334,74 USD. Si no lo dicen ustedes, lo va a decir el jurado.
+- **Discord es contexto externo**, no una medición. Discord no publicó su gasto total en servidores. La cuenta de 3.000 t3.small es lineal y depende del supuesto de una petición cada 10 s por usuario.
+- **40.800 contra 20.412 documentos.** 40.800 son por listado; 20.412, por petición promedio de la mezcla (mitad listar, mitad ver).
+- **Los 5.160 ms de espera por segundo del contenedor** se suman sobre todas las CPU, por eso pasan de 1.000.
 - **Lo que viene de fichas y no de mediciones.** El precio de EBS (0,08 USD/GB-mes) es un ejemplo de la página de AWS. El TDP del Ryzen (35 W) es el de la ficha de AMD. Ninguno de los dos se midió.
+
+## Parte 6. La presentación, diapositiva por diapositiva
+
+`informe/presentacion.html`, 21 diapositivas. Las 17 primeras son la exposición, unos 7 minutos con las notas, que suman ~970 palabras. Las 4 últimas son respaldo para preguntas. Teclas: flechas para avanzar, `T` cambia el tema, el botón "Notas" muestra el guion.
+
+| # | Diapositiva | La idea en una frase | Número que hay que saber de memoria |
+|---|---|---|---|
+| 1 | Portada | Dónde correr LobbyLink, decidido con mediciones propias. | – |
+| 2 | Respuesta corta | t3.small, pero después de arreglar el código. | 21,26 USD/mes de máquina a 80 req/s (334,74 con salida a internet); p95 16 ms; ×14 de capacidad con el arreglo, ×3 con el PC |
+| 3 | La aplicación | El listado hace dos consultas extra por lobby. | ~406 consultas por listado con 200 lobbies |
+| 4 | El procedimiento | Cada número de carga sale del paso anterior. | 85,8 ms → 23,3 req/s → codo al 51 % → escalera 5–80 |
+| 5 | La escalera | La escalera duplica y encierra el codo de cada máquina. | Codos: PC 35,8–42,9; contenedor 10,2–12,5; t3.small 11,8–14,5 |
+| 6 | Las máquinas | Tres opciones, con ficha y costo. | PC 4 núcleos para la app; t3.small 1 núcleo con 2 hilos |
+| 7 | Resultado con el código original | Ninguna aguanta más de 20 req/s. | t3.small y contenedor 10; PC 20 (40 en 2 de 3) |
+| 8 | Dónde espera | En la CPU; disco y red casi sin uso. | `us` 39,9 %, `wa` 0,0 %, 1 IOPS de 354, red 0,03 % |
+| 9 | Por qué: núcleos | Los núcleos físicos marcan el techo. | p = 0,981 PC contra 0,743 t3.small; SMT +59 %; reloj 1,51× |
+| 10 | Contenedor | Manda el límite que pusimos. | 4 CPU a la app: 18,0 → 17,8; 2 CPU a MongoDB: 26,9 |
+| 11 | El arreglo | De ~406 consultas a 2, respuestas idénticas. | 95 de 95 respuestas iguales |
+| 12 | Resultado con el código corregido | Las tres pasan toda la escalera. | p95 12–23 ms; 0 errores; CPU 28,8 % a 80 req/s |
+| 13 | Carga por diez | Original: se rompe la CPU. Corregido: nada. ×100 datos: la memoria. | 20.000 lobbies: solo el PC pasa (p95 336 ms) |
+| 14 | Costo | A la misma carga, la máquina es barata y la red cara. | 35,91 / 21,26 / 334,74 USD; 0,10 y 1,59 USD por millón |
+| 15 | Escala real (Discord) | Referencia externa: a escala cuesta la red. | 3.000 t3.small, ~64.000 USD/mes de máquinas, ~1 M con la red |
+| 16 | Recomendación | t3.small Unlimited con el arreglo. | 16,78 hasta 40 req/s; 21,26 a 80 |
+| 17 | Lo que falta | El arreglo movió el límite, no lo eliminó. | Paginar antes de 20.000 lobbies; login 83,6 ms |
+| 18–21 | Respaldo | Preguntas típicas, quién gasta la CPU, disco, cómo reproducir. | – |
+
+**Las dos diapositivas nuevas que más preguntas van a traer.**
+
+- **Costo (14).** Ahora compara todo a la misma carga: 10 req/s con el código original, que es lo que aguantan las tres, y 80 req/s con el corregido. Hay que decir en voz alta que el "21 USD" es solo máquina y disco. Si los clientes están en internet, AWS cobra la salida: 0,09 USD por GB después de los 100 GB gratis del mes. A 80 req/s salen 3.583 GiB al mes porque el listado sin páginas manda unos 18 KB por respuesta, y el total sube a 334,74 USD. Desde unos 8 req/s sostenidos la t3.small ya cuesta más que el PC. El PC y el contenedor no incluyen el plan de internet ni una IP pública, así que tampoco son una comparación perfecta.
+- **Escala real (15).** No es una medición nuestra y la diapositiva lo dice arriba. Los datos de Discord salen de fuentes primarias: el caso de Cloudflare (2,4 M de usuarios a la vez en julio de 2016 y más de 100.000 USD al mes ahorrados en Google Cloud), el blog de Discord del 13-01-2017 (dejó MongoDB a los 100 millones de mensajes porque "los datos y el índice ya no cabían en RAM") y discord.com/company (más de 90 M de usuarios diarios, cuarto trimestre de 2025). La cuenta es nuestra y lineal a propósito. Supone una petición cada 10 s por usuario, así que una t3.small a 80 req/s atiende unos 800. Para 2,4 M de usuarios harían falta 240.000 req/s, o sea 3.000 instancias. Eso da 3.000 × 21,26 ≈ 64.000 USD/mes de máquinas y 3.000 × 334,74 ≈ 1 M USD/mes con la salida. El 1 M está inflado: usa la tarifa plana de 0,09 USD/GB y AWS cobra menos por GB a ese volumen.
+
+**Lo que no hay que decir.** Discord no publicó cuánto paga en total por servidores. Las cifras de su supuesta salida a bolsa que circulan en blogs no están verificadas y no las usamos. Tampoco usamos los "4.000 millones de mensajes al día", que no tienen fuente primaria.
+
+## Parte 7. Banco de preguntas posibles
+
+Fórmula para responder cualquier pregunta: **número medido → componente que lo causa → dónde está el dato**. Si la respuesta no está medida, se dice "eso no lo medimos" y se ofrece lo más cercano que sí se midió. Un número inventado en la sustentación es peor que decir que no se midió.
+
+### Criterio 1: mediciones propias y reproducibles (1,0)
+
+**¿Cómo repito una corrida suya?**
+Con los guiones: `telemetry/rate.mjs` genera la carga y `campanas/campana.sh` corre la campaña. Cada corrida usa una semilla (1, 2 y 3), una base de Mongo nueva y una carpeta propia con `load.ndjson`, `agent.ndjson`, `run.json` e `idle.json`. La diapositiva de respaldo "reproducir" tiene los comandos.
+
+**¿Por qué tasa fija y no N usuarios en bucle?**
+En bucle cerrado, si el servidor se frena, los clientes mandan menos peticiones y la latencia que se mide es la de una fila que se regula sola. Con tasa fija las peticiones salen a su hora, conteste o no el servidor, así que el colapso se ve entero: a 20 req/s la t3.small contesta ~2 por segundo con 89 % de errores. El bucle cerrado lo usamos solo donde queríamos el máximo: paralelismo (F3) y cuotas (F4).
+
+**¿Ninguna tasa es supuesta?** (cuidado: el informe lo dice así)
+La respuesta honesta: los techos y los codos salen de mediciones (F1 y F5). La escalera 5–80 es una malla que duplica. La fijamos sobre los codos de nuestra primera medición y la rampa confirmó que los encierra. El requisito de 1 s y los 200 lobbies son elecciones nuestras, declaradas y probadas como variables (Parte 4).
+
+**¿El generador no le roba CPU a la app en el PC?**
+Sí puede, y está declarado como límite. Para reducirlo, la app y `mongod` corren en los hilos 0 a 7 y el generador en los 8 a 11. En la nube el generador corre en otra máquina (c7i-flex.large).
+
+**¿Cuánto varían las repeticiones?**
+Poco donde pasa. La t3.small original a 10 req/s da un p95 de 393 a 408 ms en las 3 repeticiones. La excepción es el PC original a 40 req/s, que pasa en 2 de 3 porque el escalón cae justo en su codo, y así se presenta. El arreglado tiene 2 repeticiones en el PC y el contenedor, no 3.
+
+**¿Por qué 10 minutos por escalón?**
+Para que sea carga sostenida y haya muestras para el p99. A 80 req/s son 48.000 peticiones, así que el 1 % más lento son unas 480. Con 90 s, como en la rampa, sirve para encontrar el codo pero no para el p99.
+
+**¿Restaron el consumo en reposo?**
+Sí: `idle.json` se mide antes de cada corrida. En algunas corridas del PC el reposo salió sucio (11-16 %) por otros programas. Ahí se compara con la latencia, no con los ms de CPU.
+
+**¿Por qué el PC tiene otras versiones de MongoDB y Java?**
+Es una diferencia real y está declarada: el PC usa MongoDB 9.0.4 y Java 25; el contenedor y la t3.small, 7.0.45 y 21. Para el login probamos que no es Java: con Temurin 21 en el PC el p50 sigue en 111,9 ms.
+
+### Criterio 2: dónde espera (1,5)
+
+**¿Cómo saben que es CPU y no disco?**
+`us` 39,9 % con `wa` 0,0 %. El disco hace 1 IOPS cuando F0 midió que da 354 escrituras con `fsync` y 3.049 lecturas por segundo. La caché de WiredTiger tiene 0 % de fallos porque los datos ocupan ~10 MB de 440 MB.
+
+**Si la CPU está al 48 %, ¿por qué falla a 20 req/s?**
+El 48,2 % es el promedio a 10 req/s, con picos de 99,5 %. A 20 req/s haría falta 20 × 85,8 = 1.716 ms de CPU por segundo de 2.000 disponibles, es decir 86 %. Con llegadas al azar, la espera media crece como S / (1 − U): al 50 % es el doble del servicio, al 86 % unas 7 veces. Como un listado cuesta 167 ms, eso ya pasa de 1 s.
+
+**¿Por qué con el arreglo el codo está más cerca del techo?**
+Por la misma fórmula. Con el arreglo una petición cuesta ~7 ms, así que aun multiplicada por 7 queda en decenas de ms. Hacen falta unas 140 peticiones en fila para pasar de 1 s; con el código original bastaban unas 5. Por eso el codo sube del 50-60 % al 80-90 % del techo.
+
+**¿Por qué `mongod` gasta más que Java?**
+Por el N+1: unas 206 `find` y 200 conteos por listado. Cada consulta se analiza, se planifica y recorre documentos dentro de `mongod`, que en la t3.small usa 62 % de un núcleo contra 34 % de la app.
+
+**¿Y la caché del procesador? ¿No espera a la memoria?**
+Con el microbenchmark medimos RAM a 101-118 ns por acceso. Aunque cada uno de los ~40.800 documentos que examina un listado fuera un fallo a RAM, serían 4,8 ms de 167,4 ms, un 2,9 %. No medimos fallos de caché con contadores de hardware, y así hay que decirlo.
+
+**¿40.800 o 20.412 documentos?**
+Las dos cifras están bien. Un listado examina unos 40.800 documentos. La mezcla es mitad listar y mitad ver, así que por petición promedio son ~20.412.
+
+**¿Cómo puede el contenedor esperar 5.160 ms por segundo?**
+Ese tiempo congelado se suma sobre todas las CPU donde había hilos esperando. Con varios hilos congelados a la vez, la suma pasa de 1.000 ms por segundo.
+
+**¿Por qué Java en el contenedor se queda sin memoria antes que en la t3.small?**
+Por defecto la JVM toma un cuarto de la memoria que ve: 256 MB con 1 GB de límite y 478 MB en la t3.small. En un contenedor hay que fijar `-Xmx`. Pero con el código original lo que tumba los 100 req/s es la CPU de `mongod`: con `-Xmx700m` sigue fallando el 100 % sin `OutOfMemoryError`.
+
+**¿La red no importa?**
+Para el rendimiento, no: 0,17 MB/s, el 0,03 % del enlace. Para el costo sí, y mucho (diapositiva 14). En el PC no medimos la red porque el tráfico va por loopback.
+
+### Criterio 3: comparación justa (1,0)
+
+**¿Es justo comparar un portátil de 4 núcleos con una instancia de 1?**
+Se compara la misma aplicación con la misma mezcla, la misma escalera, las mismas semillas, la misma regla de "pasa" y una base nueva cada vez. Lo que cambia es la máquina, y eso es lo que se quiere medir. El costo se normaliza por millón de peticiones para no comparar precios a cargas distintas.
+
+**¿Por qué el contenedor tiene 1 CPU para la app y 1 para MongoDB?**
+Para parecerse a la t3.small (2 vCPU). Y sale lo mismo: 10 req/s con el código original y toda la escalera con el corregido.
+
+**El precio del contenedor no es real.**
+Correcto: es un prorrateo de 2 de 12 hilos del PC, no un precio de mercado. La diapositiva lo dice. El del PC también es estimado: depreciación más energía con TDP de ficha y TRM de 3.237,83.
+
+**¿Por qué el login es dos veces más lento en el PC con Windows?**
+El contador de frecuencia mostró los hilos de la app a ~2,1 GHz contra 4,63 GHz dentro del contenedor, sobre el mismo Ryzen. Eso explica la mayor parte (2,18 de frecuencia contra 1,87 de latencia). No sabemos por qué Windows mantiene el reloj bajo, y no lo inventamos.
+
+**¿Por qué no probaron otras instancias (t4g, c7a, Graviton)?**
+No las medimos. La c7a.2xlarge aparece solo como precio de la nube más parecida al PC: 301,31 USD/mes, 18 veces la t3.small, para capacidad que LobbyLink corregido no necesita. Una ARM sería la siguiente prueba.
+
+### Criterio 4: arquitectura (1,5)
+
+**¿Qué dice Amdahl de su código?**
+En el PC, p = 0,981 en el listado y 0,945 en el login: solo el 1,9 % y el 5,5 % son secuenciales. La t3.small da 0,743 con el mismo código, así que la diferencia no es del código: el segundo cliente cae en el segundo hilo del mismo núcleo, que suma +59 % y no +100 %.
+
+**¿Qué es SMT y por qué el login lo aprovecha más?**
+Dos hilos por núcleo físico que comparten las unidades de ejecución. BCrypt deja huecos esperando lecturas de sus tablas en L1, y el otro hilo los usa: +84 % en el PC y +71 % en la t3.small. En el listado es +57 a +59 %.
+
+**¿Qué es la línea base de la t3 y por qué importa?**
+La t3 gana 24 créditos por hora, que equivalen al 20 % de cada vCPU. En Standard, sin créditos, queda a 0,4 vCPU (`steal` 78,8 %) y sirve 2 req/s con el código original. En Unlimited cobra el exceso a 0,05 USD por vCPU-hora: 19,13 USD/mes a 10 req/s con el original y 0 hasta 40 con el corregido. La predicción de cuánto duraban los créditos acertó con 2 minutos de diferencia (70 predichos, 72 medidos).
+
+**¿Por qué el arreglo no usa un índice?**
+Para aislar el efecto: el cambio quita las idas y vueltas (de ~406 consultas a 2) sin tocar la base. Un índice en el conteo abarataría cada consulta pero no quitaría las 406. No lo medimos.
+
+**Si mañana hubiera 10 veces más usuarios, ¿qué harían?**
+Con el código corregido, nada: 100 req/s pasa con la t3.small al 34 % (predicho 30 %). Lo siguiente que se rompe es el listado sin páginas cuando crecen los datos, así que el siguiente cambio es paginar `GET /api/lobbies`. Como la autenticación es JWT sin estado, se pueden poner varias instancias de la app detrás de un balanceador, y entonces el límite pasaría a MongoDB. Nada de esto está medido.
+
+**¿Por qué la recomendación no es el PC, si es el más rápido y más barato que la nube con salida?**
+No es un servidor: Windows, sin IP pública, sin redundancia de energía ni de disco, y el generador corría en la misma máquina. El precio no lo descarta; lo descarta la operación.
+
+**¿Qué pasa con 1.000.000 de lobbies?**
+Lo probamos pidiendo un lobby a la vez (F9): fallos de caché del 12-14 %, 365 IOPS (12 % del disco), `wa` 3,4 %, p95 de 28 a 121 ms, y la CPU al 72 % igual. Es lo mismo que contó Discord con MongoDB en 2015, en pequeño: cuando los datos no caben en RAM, la latencia se vuelve impredecible. El listado completo sobre esa base no lo probamos.
+
+### Costo y escala
+
+**¿Por qué no usar instancias reservadas o Savings Plans?**
+No las cotizamos. Bajarían la parte de la instancia, no la salida a internet, que es lo que domina desde ~8 req/s.
+
+**¿Cómo bajarían la factura de salida?**
+Paginando el listado para que cada respuesta pese menos de los ~18 KB actuales, comprimiendo las respuestas o poniendo una caché o CDN delante, como hizo Discord. No lo medimos.
+
+**¿El dato de Discord cuenta como medición?**
+No, y lo decimos en la diapositiva. Es contexto para dimensionar, con fuente primaria y una cuenta declarada. Lo único medido ahí son nuestros 80 req/s, 21,26 y 334,74 USD.
+
+**¿De dónde sale "un usuario hace una petición cada 10 s"?**
+Es un supuesto, y se dice así. Si fueran 5 s, se duplican las instancias. La conclusión no cambia: a escala la máquina es barata y la red cara.
+
+## Parte 8. Cómo prepararse
+
+**1. Tarjeta de números (memorizar).** Si dudan, estos son los que más se preguntan:
+
+| Qué | Número |
+|---|---|
+| CPU por petición de la mezcla, t3.small original | 85,8 ms (listar 167,4; ver 4,2) |
+| Techo predicho original: PC / contenedor / t3.small | 71 / 20 / 23,3 req/s |
+| Máximo que pasa, original | PC 20 (40 en 2 de 3), contenedor y t3.small 10 |
+| Dónde espera (t3.small, 10 req/s) | `us` 39,9 %, `wa` 0,0 %, 1 IOPS, red 0,03 %, `mongod` 62 % contra app 34 % |
+| Consultas por listado | ~406 antes, 2 después |
+| Listado corregido | ~7 ms de CPU; techos 1.288,9 / 262,3 / 336,5 req/s |
+| Corregido a 80 req/s | p95 12-23 ms, 0 errores, t3.small al 28,8 % |
+| Amdahl y SMT | p 0,981 (PC) contra 0,743 (t3.small); +59 % listar, +84 % login |
+| Reloj | 4,63 GHz (contenedor) contra 3,07 GHz (Xeon): 1,51× |
+| Costo t3.small | 16,78 hasta 40 req/s; 21,26 a 80; 334,74 con salida a internet |
+| Original a 10 req/s | 35,91 USD/mes, 19,13 de créditos |
+| Discord 2016 (externo) | 2,4 M a la vez; >100.000 USD/mes ahorrados con caché |
+
+**2. Ensayo cronometrado.** Lean las notas en voz alta con cronómetro, al menos tres veces. Son ~970 palabras, justo 7 minutos. Si se pasan de 7:15, las primeras notas que se acortan son las de Discord (15) y las de la aplicación (3), porque las demás sostienen la rúbrica. Repártanse la exposición en bloques que no corten una idea: diapositivas 1-6 (qué y cómo), 7-13 (resultados y por qué) y 14-17 (costo y recomendación).
+
+**3. Simulacro de preguntas.** Uno elige al azar una pregunta de la Parte 7 y el otro responde en 30 segundos con la fórmula número → componente → carpeta. Si alguien responde sin un número, se repite. Practiquen también decir "no lo medimos" sin pedir perdón, seguido de lo más cercano que sí midieron.
+
+**4. Qué tener abierto el día.** La presentación (GitHub Pages o el archivo local), el anexo técnico (capítulos 4.1 costos y techos, 4.5 rampa, 8 costos, 9.1 datos y F9) y la carpeta `resultados/` lista para abrir `_logs/` si piden un dato crudo. Las diapositivas 18 a 21 sirven para preguntas: no las pasen en la exposición.
+
+**5. Las tres frases que no se pueden decir.**
+- "Es CPU" sin el número (`us` 39,9 % con `wa` 0,0 %).
+- "Medimos los fallos de caché" (no; es una cota con el microbenchmark).
+- "Discord gasta X en servidores" (no está publicado; solo el ahorro de más de 100.000 USD al mes).
